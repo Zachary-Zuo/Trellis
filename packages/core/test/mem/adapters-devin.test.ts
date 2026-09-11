@@ -145,8 +145,8 @@ db.execute("""CREATE TABLE sessions (
 db.execute("""CREATE TABLE message_nodes (
   row_id INTEGER PRIMARY KEY AUTOINCREMENT,
   session_id TEXT NOT NULL,
-  node_id INTEGER NOT NULL,
-  parent_node_id INTEGER,
+  node_id INTEGER NOT NULL,           -- node_id within this session's forest
+  parent_node_id INTEGER,             -- NULL for root nodes
   chat_message TEXT NOT NULL,
   created_at INTEGER NOT NULL
 )""")

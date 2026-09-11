@@ -16,6 +16,7 @@ import {
   openSqliteReadOnly,
   SqliteParseError,
   SqliteSnapshotUnstableError,
+  stripSqlLineComments,
   type SqliteReadOnly,
   type SqliteRow,
   type SqliteTableInfo,
@@ -72,13 +73,16 @@ export function findTable(db: SqliteReadOnly, name: string): SqliteTableInfo {
   return table;
 }
 
-/** True when `CREATE TABLE` sql declares a column of this exact name. */
+/** True when `CREATE TABLE` sql declares a column of this exact name.
+ * Line comments (`-- ...`) sit between columns in some live schemas (Devin
+ * CLI) and must not hide the next name. */
 export function declaresColumn(table: SqliteTableInfo, name: string): boolean {
+  const sql = stripSqlLineComments(table.sql);
   const pattern = new RegExp(
     `(?:\\(|,)\\s*["\`\\[]?${name}(?:["\`\\]]|\\b)`,
     "i",
   );
-  return pattern.test(table.sql);
+  return pattern.test(sql);
 }
 
 export function requireColumns(
