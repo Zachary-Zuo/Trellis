@@ -22,6 +22,7 @@ import {
   extractMemDialogue,
   listMemProjects,
   listMemSessions,
+  MEM_SOURCE_KINDS,
   MemSessionNotFoundError,
   readMemContext,
   searchMemSessions,
@@ -65,16 +66,8 @@ export function parseArgv(argv: readonly string[]): Argv {
   return { cmd, positional, flags };
 }
 
-const VALID_PLATFORMS: readonly string[] = [
-  "claude",
-  "codex",
-  "devin",
-  "grok",
-  "opencode",
-  "pi",
-  "zcode",
-  "all",
-];
+const VALID_PLATFORMS: readonly string[] = [...MEM_SOURCE_KINDS, "all"];
+const PLATFORM_HELP = VALID_PLATFORMS.join("|");
 
 /** Translate parsed CLI flags into a core `MemFilter`. Validation failures
  * exit the process — core never sees raw CLI flags. */
@@ -466,7 +459,7 @@ commands:
                                 use this to discover which --cwd to pass to search
 
 flags:
-  --platform claude|codex|devin|grok|opencode|pi|zcode|all   default all
+  --platform ${PLATFORM_HELP}   default all
   --since YYYY-MM-DD                     inclusive lower bound
   --until YYYY-MM-DD                     inclusive upper bound
   --global                               include all projects (default: cwd-scoped)

@@ -314,8 +314,11 @@ zero-dependency parser as ZCode / OpenCode. This is **not** `trellis init
 - **Sessions**: `sessions` table; skip `hidden != 0`. cwd is
   `working_directory`; timestamps are Unix seconds.
 - **Dialogue**: `message_nodes` is a forest. Walk `parent_node_id` from
-  `main_chain_id` (else `max(node_id)`) so revert/fork side branches are
-  dropped. Keep `role=user` with `metadata.is_user_input === true` and
+  `main_chain_id` so revert/fork side branches are dropped. A missing
+  `main_chain_id` column is a schema warning; a null/unknown tip yields an
+  empty chain plus `devin-main-chain-missing` (never `max(node_id)`, which
+  is often an abandoned fork). `parent_node_id` is required. Keep
+  `role=user` with `metadata.is_user_input === true` and
   `role=assistant` `content` strings; drop `tool` / `system` / `thinking`.
 - **Compaction**: `system` nodes with `metadata.extensions["devin-rs/summary"]`
   become a boundary marker; pre-compact turns stay in the pool.

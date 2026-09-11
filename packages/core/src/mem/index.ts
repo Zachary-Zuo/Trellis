@@ -23,6 +23,8 @@ export { readMemContext } from "./context.js";
 
 export { listMemProjects } from "./projects.js";
 
+export { MEM_SOURCE_KINDS } from "./types.js";
+
 export type {
   MemSourceKind,
   MemSourceFilter,

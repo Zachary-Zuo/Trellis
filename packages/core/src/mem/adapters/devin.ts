@@ -32,22 +32,23 @@
  * never opened for write, locked, checkpointed, or copied over.
  */
 
-import * as fs from "node:fs";
-
 import {
   compactionBoundaryTurn,
   stripInjectionTags,
   isBootstrapTurn,
 } from "../dialogue.js";
 import { inRangeOverlap, sameProject } from "../filter.js";
-import {
-  openSqliteReadOnly,
-  SqliteParseError,
-  SqliteSnapshotUnstableError,
-  type SqliteRow,
-  type SqliteTableInfo,
-} from "../internal/sqlite-readonly.js";
 import { devinCliDbPath } from "../internal/paths.js";
+import {
+  createSqlitePreparedStore,
+  findTable,
+  requireColumns,
+  requireRowColumns,
+  scanAndDiscard,
+  withSqliteDb,
+  type SqliteWarningCopy,
+} from "../internal/sqlite-adapter.js";
+import { type SqliteReadOnly, type SqliteRow } from "../internal/sqlite-readonly.js";
 import { parseTaskPyCommandsAll } from "../phase.js";
 import { searchInDialogue } from "../search.js";
 import type {
@@ -121,81 +122,19 @@ function execCommandsFrom(msg: Record<string, unknown>): string[] {
 const SESSION_TABLE = "sessions";
 const NODE_TABLE = "message_nodes";
 
-class DevinSchemaError extends SqliteParseError {
-  constructor(message: string) {
-    super(message);
-    this.name = "DevinSchemaError";
-  }
-}
+const SQLITE_WARNINGS: SqliteWarningCopy = {
+  unreadableCode: "devin-db-unreadable",
+  snapshotUnstableCode: "devin-db-snapshot-unstable",
+  schemaUnsupportedCode: "devin-db-schema-unsupported",
+  writingMessage: (dbPath) =>
+    `Devin CLI is writing to its session database; retry in a moment (${dbPath})`,
+  unreadableMessage: (dbPath, error) =>
+    `cannot read Devin CLI session database (${dbPath}): ${error.message}`,
+  unsupportedMessage: (dbPath, error) =>
+    `unsupported Devin CLI session schema (${dbPath}): ${error.message}`,
+};
 
-const DB_UNREADABLE_WARNING_CODE = "devin-db-unreadable";
-const DB_SNAPSHOT_UNSTABLE_WARNING_CODE = "devin-db-snapshot-unstable";
-const DB_SCHEMA_WARNING_CODE = "devin-db-schema-unsupported";
-
-function pushDbWarning(
-  warnings: MemWarning[],
-  dbPath: string,
-  error: SqliteParseError,
-): void {
-  const code =
-    error instanceof SqliteSnapshotUnstableError
-      ? DB_SNAPSHOT_UNSTABLE_WARNING_CODE
-      : error instanceof DevinSchemaError
-        ? DB_SCHEMA_WARNING_CODE
-        : DB_UNREADABLE_WARNING_CODE;
-  if (warnings.some((warning) => warning.code === code)) return;
-
-  const message =
-    code === DB_SNAPSHOT_UNSTABLE_WARNING_CODE
-      ? `Devin CLI is writing to its session database; retry in a moment (${dbPath})`
-      : code === DB_SCHEMA_WARNING_CODE
-        ? `unsupported Devin CLI session schema (${dbPath}): ${error.message}`
-        : `cannot read Devin CLI session database (${dbPath}): ${error.message}`;
-  warnings.push({ code, message });
-}
-
-type ReadOnlyDb = ReturnType<typeof openSqliteReadOnly>;
-
-function findTable(db: ReadOnlyDb, name: string): SqliteTableInfo {
-  const table = db.listTables().find((item) => item.name === name);
-  if (!table) {
-    throw new DevinSchemaError(`missing table: ${name}`);
-  }
-  return table;
-}
-
-function declaresColumn(table: SqliteTableInfo, name: string): boolean {
-  const pattern = new RegExp(
-    `(?:\\(|,)\\s*["\`\\[]?${name}(?:["\`\\]]|\\b)`,
-    "i",
-  );
-  return pattern.test(table.sql);
-}
-
-function requireColumns(
-  table: SqliteTableInfo,
-  names: readonly string[],
-): void {
-  const missing = names.filter((name) => !declaresColumn(table, name));
-  if (missing.length > 0) {
-    throw new DevinSchemaError(
-      `table ${table.name} is missing column(s): ${missing.join(", ")}`,
-    );
-  }
-}
-
-function requireRowColumns(
-  row: SqliteRow,
-  tableName: string,
-  names: readonly string[],
-): void {
-  const missing = names.filter((name) => !(name in row));
-  if (missing.length > 0) {
-    throw new DevinSchemaError(
-      `table ${tableName} is missing column(s): ${missing.join(", ")}`,
-    );
-  }
-}
+const MAIN_CHAIN_MISSING_WARNING_CODE = "devin-main-chain-missing";
 
 // ---------- slim store ----------
 
@@ -275,31 +214,40 @@ function slimFromChatMessage(
 }
 
 /**
- * Parse message_nodes inside the `scanTable` predicate and always return
- * false, so `scanTable` never retains a raw row. A live `chat_message`
- * column is ~200 MB of TEXT; holding it next to the parsed copies is what
- * blew RSS on the Cursor adapter.
+ * Parse message_nodes inside the scan visitor and never retain a raw row. A
+ * live `chat_message` column is ~200 MB of TEXT; holding it next to the
+ * parsed copies is what blew RSS on the Cursor adapter.
  */
 function scanMessageNodes(
-  db: ReadOnlyDb,
+  db: SqliteReadOnly,
   sessionId: string | undefined,
   store: DevinSessionStore,
 ): void {
   const table = findTable(db, NODE_TABLE);
-  requireColumns(table, ["session_id", "node_id", "chat_message"]);
+  requireColumns(table, [
+    "session_id",
+    "node_id",
+    "parent_node_id",
+    "chat_message",
+  ]);
   let checkedRowShape = false;
 
-  db.scanTable(NODE_TABLE, (row) => {
+  scanAndDiscard(db, NODE_TABLE, (row) => {
     if (!checkedRowShape) {
       checkedRowShape = true;
-      requireRowColumns(row, NODE_TABLE, ["session_id", "node_id", "chat_message"]);
+      requireRowColumns(row, NODE_TABLE, [
+        "session_id",
+        "node_id",
+        "parent_node_id",
+        "chat_message",
+      ]);
     }
     const sid = typeof row.session_id === "string" ? row.session_id : "";
-    if (!sid) return false;
-    if (sessionId !== undefined && sid !== sessionId) return false;
+    if (!sid) return;
+    if (sessionId !== undefined && sid !== sessionId) return;
 
     const nodeId = asFiniteNumber(row.node_id);
-    if (nodeId === undefined) return false;
+    if (nodeId === undefined) return;
     const parentRaw = row.parent_node_id;
     const parentNodeId =
       parentRaw === null || parentRaw === undefined
@@ -311,24 +259,17 @@ function scanMessageNodes(
     bundle.nodes.push(
       slimFromChatMessage(nodeId, parentNodeId, createdAt, row.chat_message),
     );
-    return false;
   });
 }
 
-function attachMainChainIds(db: ReadOnlyDb, store: DevinSessionStore): void {
+function attachMainChainIds(db: SqliteReadOnly, store: DevinSessionStore): void {
   const table = findTable(db, SESSION_TABLE);
-  if (!declaresColumn(table, "id")) {
-    throw new DevinSchemaError("table sessions is missing column(s): id");
-  }
-  const hasMain = declaresColumn(table, "main_chain_id");
-  if (!hasMain) return;
-
-  db.scanTable(SESSION_TABLE, (row) => {
+  requireColumns(table, ["id", "main_chain_id"]);
+  scanAndDiscard(db, SESSION_TABLE, (row) => {
     const id = typeof row.id === "string" ? row.id : "";
-    if (!id) return false;
+    if (!id) return;
     const bundle = store.bundles.get(id);
     if (bundle) bundle.mainChainId = asFiniteNumber(row.main_chain_id);
-    return false;
   });
 }
 
@@ -337,35 +278,31 @@ function loadStore(
   warnings: MemWarning[],
   sessionId?: string,
 ): DevinSessionStore {
-  if (!fs.existsSync(dbPath)) return emptySessionStore();
-  const store = emptySessionStore();
-  try {
-    const db = openSqliteReadOnly(dbPath);
-    try {
+  return withSqliteDb(
+    dbPath,
+    warnings,
+    SQLITE_WARNINGS,
+    emptySessionStore(),
+    (db) => {
+      const store = emptySessionStore();
       scanMessageNodes(db, sessionId, store);
       attachMainChainIds(db, store);
-    } finally {
-      db.close();
-    }
-  } catch (error) {
-    if (!(error instanceof SqliteParseError)) throw error;
-    pushDbWarning(warnings, dbPath, error);
-    return emptySessionStore();
-  }
-  return store;
+      return store;
+    },
+  );
 }
 
-let preparedStore: { dbPath: string; store: DevinSessionStore } | null = null;
+const preparedStore = createSqlitePreparedStore<DevinSessionStore>();
 
 export function prepareDevinSessionStore(
   dbPath: string,
   warnings: MemWarning[] = [],
 ): void {
-  preparedStore = { dbPath, store: loadStore(dbPath, warnings) };
+  preparedStore.prepare(dbPath, () => loadStore(dbPath, warnings));
 }
 
 export function releaseDevinSessionStore(): void {
-  preparedStore = null;
+  preparedStore.release();
 }
 
 function readSessionBundle(
@@ -373,8 +310,9 @@ function readSessionBundle(
   sessionId: string,
   warnings: MemWarning[],
 ): SessionBundle {
-  if (preparedStore?.dbPath === dbPath) {
-    return preparedStore.store.bundles.get(sessionId) ?? { nodes: [] };
+  const prepared = preparedStore.get(dbPath);
+  if (prepared) {
+    return prepared.bundles.get(sessionId) ?? { nodes: [] };
   }
   return loadStore(dbPath, warnings, sessionId).bundles.get(sessionId) ?? {
     nodes: [],
@@ -382,23 +320,17 @@ function readSessionBundle(
 }
 
 /**
- * Follow `parent_node_id` from the main-chain tip back to the root, then
- * reverse so the result is chronological. Linear `ORDER BY node_id` would
- * include revert/fork side branches.
+ * Follow `parent_node_id` from `main_chain_id` back to the root, then reverse
+ * so the result is chronological. Missing / unknown tip is not guessed via
+ * max(node_id) — that is often an abandoned fork.
  */
-function walkMainChain(bundle: SessionBundle): SlimNode[] {
+function walkMainChain(bundle: SessionBundle): SlimNode[] | "missing-tip" {
   const { nodes } = bundle;
   if (nodes.length === 0) return [];
   const byId = new Map<number, SlimNode>();
-  let maxId = nodes[0]?.nodeId ?? 0;
-  for (const node of nodes) {
-    byId.set(node.nodeId, node);
-    if (node.nodeId > maxId) maxId = node.nodeId;
-  }
-  const tip =
-    bundle.mainChainId !== undefined && byId.has(bundle.mainChainId)
-      ? bundle.mainChainId
-      : maxId;
+  for (const node of nodes) byId.set(node.nodeId, node);
+  const tip = bundle.mainChainId;
+  if (tip === undefined || !byId.has(tip)) return "missing-tip";
 
   const chain: SlimNode[] = [];
   const seen = new Set<number>();
@@ -436,30 +368,28 @@ export function devinListSessions(
   warnings: MemWarning[] = [],
 ): MemSessionInfo[] {
   const dbPath = devinCliDbPath();
-  if (dbPath === undefined || !fs.existsSync(dbPath)) return [];
+  if (dbPath === undefined) return [];
 
-  let rows: SqliteRow[];
-  try {
-    const db = openSqliteReadOnly(dbPath);
-    try {
+  const rows = withSqliteDb(
+    dbPath,
+    warnings,
+    SQLITE_WARNINGS,
+    null as SqliteRow[] | null,
+    (db) => {
       const table = findTable(db, SESSION_TABLE);
       requireColumns(table, ["id", "working_directory", "created_at"]);
-      rows = db.scanTable(SESSION_TABLE);
-      if (rows[0]) {
-        requireRowColumns(rows[0], SESSION_TABLE, [
+      const scanned = db.scanTable(SESSION_TABLE);
+      if (scanned[0]) {
+        requireRowColumns(scanned[0], SESSION_TABLE, [
           "id",
           "working_directory",
           "created_at",
         ]);
       }
-    } finally {
-      db.close();
-    }
-  } catch (error) {
-    if (!(error instanceof SqliteParseError)) throw error;
-    pushDbWarning(warnings, dbPath, error);
-    return [];
-  }
+      return scanned;
+    },
+  );
+  if (!rows) return [];
 
   const out: MemSessionInfo[] = [];
   for (const row of rows) {
@@ -521,6 +451,15 @@ export function collectDevinTurnsAndEvents(
 ): { turns: DialogueTurn[]; events: TaskPyEvent[] } {
   const bundle = readSessionBundle(s.filePath, s.id, warnings);
   const chain = walkMainChain(bundle);
+  if (chain === "missing-tip") {
+    if (!warnings.some((w) => w.code === MAIN_CHAIN_MISSING_WARNING_CODE)) {
+      warnings.push({
+        code: MAIN_CHAIN_MISSING_WARNING_CODE,
+        message: `Devin CLI session ${s.id} has no usable main_chain_id; refusing to walk a fork (${s.filePath})`,
+      });
+    }
+    return { turns: [], events: [] };
+  }
   const turns: DialogueTurn[] = [];
   const events: TaskPyEvent[] = [];
 
