@@ -1,7 +1,7 @@
 /**
  * Public surface for `@mindfoldhq/trellis-core/mem` — reusable retrieval and
- * dialogue-context extraction over persisted Claude Code / Codex / OpenCode
- * sessions.
+ * dialogue-context extraction over persisted Claude Code / Codex / Devin CLI /
+ * OpenCode sessions.
  *
  * This subpackage is intentionally NOT re-exported from the root
  * `@mindfoldhq/trellis-core` barrel. Import it explicitly:

@@ -17,6 +17,14 @@ import {
   collectCodexTurnsAndEvents,
 } from "./adapters/codex.js";
 import {
+  collectDevinTurnsAndEvents,
+  devinExtractDialogue,
+  devinListSessions,
+  devinSearch,
+  prepareDevinSessionStore,
+  releaseDevinSessionStore,
+} from "./adapters/devin.js";
+import {
   collectGrokTurnsAndEvents,
   grokExtractDialogue,
   grokListSessions,
@@ -100,6 +108,8 @@ export function listAll(
     all.push(...claudeListSessions(f));
   if (f.platform === "all" || f.platform === "codex")
     all.push(...codexListSessions(f));
+  if (f.platform === "all" || f.platform === "devin")
+    all.push(...devinListSessions(f, warnings));
   if (f.platform === "all" || f.platform === "grok")
     all.push(...grokListSessions(f));
   if (f.platform === "all" || f.platform === "opencode")
@@ -123,6 +133,8 @@ function extractDialogue(
       return claudeExtractDialogue(s);
     case "codex":
       return codexExtractDialogue(s, warnings);
+    case "devin":
+      return devinExtractDialogue(s, warnings);
     case "grok":
       return grokExtractDialogue(s, warnings);
     case "opencode":
@@ -144,6 +156,8 @@ function searchSession(
       return claudeSearch(s, kw);
     case "codex":
       return codexSearch(s, kw);
+    case "devin":
+      return devinSearch(s, kw, warnings);
     case "grok":
       return grokSearch(s, kw);
     case "opencode":
@@ -167,6 +181,8 @@ function collectTurnsAndEvents(
       return collectClaudeTurnsAndEvents(s);
     case "codex":
       return collectCodexTurnsAndEvents(s, warnings);
+    case "devin":
+      return collectDevinTurnsAndEvents(s, warnings);
     case "grok":
       return collectGrokTurnsAndEvents(s, warnings);
     case "opencode":
@@ -236,8 +252,9 @@ interface PhaseSlice {
   warnings: MemWarning[];
 }
 
-/** Slice cleaned dialogue by phase. Claude / Codex / Grok / Pi / ZCode have
- * native boundary detection; OpenCode degrades to "all turns + warning". */
+/** Slice cleaned dialogue by phase. Claude / Codex / Devin / Grok / Pi /
+ * ZCode have native boundary detection; OpenCode degrades to "all turns +
+ * warning". */
 function sliceMemPhase(
   s: MemSessionInfo,
   phase: MemPhase,
@@ -318,8 +335,9 @@ function sliceMemPhase(
 
 // ---------- public API ----------
 
-/** List session metadata across Claude / Codex / Grok / OpenCode / Pi / ZCode,
- * sorted by recency and capped at the filter's `limit` (default 50). */
+/** List session metadata across Claude / Codex / Devin / Grok / OpenCode /
+ * Pi / ZCode, sorted by recency and capped at the filter's `limit`
+ * (default 50). */
 export function listMemSessions(
   options?: ListMemSessionsOptions,
 ): MemSessionInfo[] {
@@ -362,6 +380,10 @@ export function searchMemSessions(
     if (opencodeCandidate) {
       prepareOpencodeSessionStore(opencodeCandidate.filePath, warnings);
     }
+    const devinCandidate = candidates.find((s) => s.platform === "devin");
+    if (devinCandidate) {
+      prepareDevinSessionStore(devinCandidate.filePath, warnings);
+    }
     for (const s of candidates) {
       if (isAbsorbedChild(s)) continue;
       const hit = includeChildren
@@ -378,6 +400,7 @@ export function searchMemSessions(
   } finally {
     releaseZcodeSessionStore();
     releaseOpencodeSessionStore();
+    releaseDevinSessionStore();
   }
   matches.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;

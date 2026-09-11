@@ -37,6 +37,7 @@ export function listMemProjects(
         by_platform: {
           claude: 0,
           codex: 0,
+          devin: 0,
           grok: 0,
           opencode: 0,
           pi: 0,

@@ -10,6 +10,7 @@
 export type MemSourceKind =
   | "claude"
   | "codex"
+  | "devin"
   | "grok"
   | "opencode"
   | "pi"
