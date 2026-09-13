@@ -405,15 +405,30 @@ export const AI_TOOLS: Record<AITool, AIToolConfig> = {
       cliFlag: "droid",
     },
   },
+  /**
+   * DeepSeek Harness (dsh) — class-2 pull-based platform.
+   *
+   * DSH discovers skills from `<projectRoot>/.agents/skills/` (shared root,
+   * rank 200) and `<projectRoot>/.dsh/skills/` (DSH-private root, rank 100),
+   * plus user roots under `$DSH_HOME/skills` / `$DSH_AGENTS_HOME/skills`.
+   * SKILL.md frontmatter uses `name` (kebab-case) + `description`, matching
+   * Trellis's skill rendering. The model loads skills via the `skill` tool;
+   * users can load entry points by their `trellis-<name>` skill names. DSH
+   * surfaces that expose the slash pipeline may also accept `/trellis-<name>`.
+   *
+   * DSH injects project `AGENTS.md` at session start (workspace instructions)
+   * and supports isolated sub-agents through the `subagent` tool, so Trellis
+   * ships as class-2: workflow/bundled skills go to the shared `.agents/skills/`
+   * root via the neutral resolver (byte-identical to Codex/Gemini/Pi/Kimi
+   * writes), while DSH-private entry points (trellis-start / trellis-continue /
+   * trellis-finish-work) and collision-free role skills
+   * (trellis-agent-implement / trellis-agent-check / trellis-agent-research)
+   * live under `.dsh/skills/` with the pull-based prelude on implement/check.
+   *
+   * DSH has no project-level hooks/settings file Trellis may write, so
+   * hasHooks/hasPythonHooks stay false and no hook assets are emitted.
+   */
   dsh: {
-    // DeepSeek Harness (dsh) is a skills-first pull-based host: it reads
-    // `.agents/skills/` (agentskills.io, rank-200 project root) and its own
-    // `.dsh/skills/` (rank-100 project root) natively and the agent loads
-    // skills by name through its skill-loader tool. No session-start hook
-    // ships in the default web/headless profiles, so `hasHooks: false` and
-    // `trellis-start` stays as a user-invocable skill. Entry skills reference
-    // other skills by bare name (`trellis-<name>`), hence `cmdRefPrefix:
-    // "trellis-"`.
     name: "DeepSeek Harness (dsh)",
     templateDirs: ["common", "dsh"],
     configDir: ".dsh",
@@ -575,11 +590,9 @@ export const AI_TOOLS: Record<AITool, AIToolConfig> = {
    * `.kimi-code/skills/`.
    *
    * Kimi has no project-level hooks/settings file Trellis may write (hooks are
-   * user-level `~/.kimi-code/config.toml` only), so the Trellis agent prompts
-   * keep the pull-based prelude. They ship both as skills and as project-level
-   * custom sub-agent definitions under `.kimi-code/agents/` (Claude
-   * Code-compatible frontmatter), so the main session can dispatch
-   * `trellis-<name>` sub-agents directly.
+   * user-level `~/.kimi-code/config.toml` only) and no project-level custom
+   * sub-agent definitions (only the built-in coder/explore/plan sub-agents), so
+   * the Trellis agent prompts ship as skills with the pull-based prelude.
    */
   kimi: {
     name: "Kimi Code",

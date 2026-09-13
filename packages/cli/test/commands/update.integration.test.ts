@@ -880,6 +880,9 @@ describe("update() integration", () => {
     // sub-agent-less platforms are added, and this assertion is about the
     // block surviving the update, not about who is currently in it.
     expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).toContain(
+      "[Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code, DeepSeek Harness]",
+    );
+    expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).toContain(
       "[codex-inline, Kilo, Antigravity, Devin",
     );
     expect(readProjectFile(PATHS.WORKFLOW_GUIDE_FILE)).not.toContain("[Codex]");
@@ -1568,7 +1571,7 @@ describe("update() integration", () => {
     const updated = fs.readFileSync(workflowPath, "utf-8");
     expect(updated).toBe(replacePythonCommandLiterals(workflowMdTemplate));
     expect(updated).toContain(
-      "[Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code]",
+      "[Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code, DeepSeek Harness]",
     );
     expect(updated).toContain(
       "[/Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, Pi, ZCode, Snow, Oh My Pi]",

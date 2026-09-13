@@ -1,5 +1,5 @@
 /**
- * mem.ts — CLI wrapper over `@mindfoldhq/trellis-core/mem`.
+ * mem.ts — CLI wrapper over `@zachary/trellis-core/mem`.
  *
  * The reusable retrieval / context-extraction logic lives in core; this file
  * owns only CLI concerns: argument parsing, terminal rendering, warning
@@ -26,14 +26,14 @@ import {
   MemSessionNotFoundError,
   readMemContext,
   searchMemSessions,
-} from "@mindfoldhq/trellis-core/mem";
+} from "@zachary/trellis-core/mem";
 import type {
   MemFilter,
   MemPhase,
   MemSessionInfo,
   MemSourceFilter,
   MemSourceKind,
-} from "@mindfoldhq/trellis-core/mem";
+} from "@zachary/trellis-core/mem";
 
 // ---------- argv ----------
 
@@ -447,7 +447,7 @@ function cmdExtract(argv: Argv): void {
 }
 
 function cmdHelp(): void {
-  console.log(`trellis mem — list/search Claude/Codex/Devin/Grok/OpenCode/Pi/ZCode sessions
+  console.log(`trellis mem — list/search Claude/Codex/Devin/Grok/OpenCode/Pi/ZCode/DeepSeek Harness sessions
 
 commands:
   list                          list sessions (default if no command)
@@ -468,7 +468,7 @@ flags:
   --grep KW                              extract / context: filter turns by keyword (multi-token AND)
   --phase brainstorm|implement|all       extract: slice by Trellis brainstorm windows
                                          (default all; brainstorm = [task.py create, task.py start);
-                                         Claude/Codex/Devin/Grok/Pi/ZCode supported; OpenCode warns + returns all)
+                                         Claude/Codex/Devin/Grok/Pi/ZCode/DeepSeek Harness supported; OpenCode warns + returns all)
   --turns N                              context: number of hit turns to return (default 3)
   --around N                             context: turns of surrounding context per hit (default 1)
   --max-chars N                          context: total char budget (default 6000, ~1500 tokens)

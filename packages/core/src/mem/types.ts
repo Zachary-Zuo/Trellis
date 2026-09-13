@@ -1,5 +1,5 @@
 /**
- * Public input / output types for `@mindfoldhq/trellis-core/mem`.
+ * Public input / output types for `@zachary/trellis-core/mem`.
  *
  * This model serves persisted AI-session retrieval and dialogue-context
  * extraction only. It is intentionally separate from the channel event schema:
@@ -15,6 +15,7 @@ export const MEM_SOURCE_KINDS = [
   "opencode",
   "pi",
   "zcode",
+  "dsh",
 ] as const;
 export type MemSourceKind = (typeof MEM_SOURCE_KINDS)[number];
 export type MemSourceFilter = MemSourceKind | "all";

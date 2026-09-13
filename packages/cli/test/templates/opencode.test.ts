@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -20,6 +26,7 @@ import {
   hasInjectedTrellisContext,
 } from "../../src/templates/opencode/lib/session-utils.js";
 import injectSubagentContextPlugin from "../../src/templates/opencode/plugins/inject-subagent-context.js";
+import injectSpecContextPlugin from "../../src/templates/opencode/plugins/inject-spec-context.js";
 import sessionStartPlugin from "../../src/templates/opencode/plugins/session-start.js";
 import injectWorkflowStatePlugin from "../../src/templates/opencode/plugins/inject-workflow-state.js";
 
@@ -48,6 +55,174 @@ async function createOpenCodeInjectHooks(
   })) as OpenCodeInjectHooks;
 }
 
+interface OpenCodeSpecHooks {
+  event: (input: { event: unknown }) => Promise<void>;
+  "tool.execute.before": (
+    input: { tool: string; sessionID: string },
+    output: { args: Record<string, unknown> },
+  ) => Promise<void>;
+}
+
+function setupSpecHookFixture(): string {
+  const dir = mkdtempSync(join(tmpdir(), "trellis-opencode-spec-"));
+  const hooksDir = join(dir, ".opencode", "hooks");
+  mkdirSync(hooksDir, { recursive: true });
+  writeFileSync(
+    join(hooksDir, "inject-spec-context.py"),
+    [
+      "import json",
+      "import sys",
+      "from pathlib import Path",
+      "",
+      "payload = json.load(sys.stdin)",
+      'root = Path(payload["cwd"])',
+      'log = root / "hook-events.jsonl"',
+      'with log.open("a", encoding="utf-8") as handle:',
+      '    handle.write(json.dumps(payload) + "\\n")',
+      'state = root / "hook-state"',
+      'if payload.get("hook_event_name") == "SessionStart":',
+      "    state.unlink(missing_ok=True)",
+      "elif not state.exists():",
+      '    state.write_text("seen", encoding="utf-8")',
+      '    print(json.dumps({"hookSpecificOutput": {"additionalContext": "<spec-context>OPEN_CODE_SPEC_RULE</spec-context>", "permissionDecision": "deny"}}))',
+      "",
+    ].join("\n"),
+    "utf-8",
+  );
+  return dir;
+}
+
+describe("opencode dynamic spec injection", () => {
+  it("shows governing specs before a write, allows retry, and resets after compaction", async () => {
+    const dir = setupSpecHookFixture();
+    try {
+      const hooks = (await injectSpecContextPlugin({
+        directory: dir,
+      })) as OpenCodeSpecHooks;
+      const output = {
+        args: { filePath: "src/demo.ts", content: "wrong" },
+      };
+
+      await expect(
+        hooks["tool.execute.before"](
+          { tool: "write", sessionID: "session-a" },
+          output,
+        ),
+      ).rejects.toThrow("OPEN_CODE_SPEC_RULE");
+      await expect(
+        hooks["tool.execute.before"](
+          { tool: "write", sessionID: "session-a" },
+          output,
+        ),
+      ).resolves.toBeUndefined();
+
+      await hooks.event({
+        event: {
+          type: "session.compacted",
+          properties: { sessionID: "session-a" },
+        },
+      });
+
+      await expect(
+        hooks["tool.execute.before"](
+          { tool: "write", sessionID: "session-a" },
+          output,
+        ),
+      ).rejects.toThrow("OPEN_CODE_SPEC_RULE");
+
+      const events = readFileSync(join(dir, "hook-events.jsonl"), "utf-8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(events[0]).toMatchObject({
+        hook_event_name: "PreToolUse",
+        session_id: "session-a",
+        tool_name: "Write",
+        tool_input: { file_path: "src/demo.ts" },
+      });
+      expect(events[2]).toMatchObject({
+        hook_event_name: "SessionStart",
+        session_id: "session-a",
+        source: "compact",
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("forwards the native apply_patch grammar to the shared spec engine", async () => {
+    const dir = setupSpecHookFixture();
+    try {
+      const hooks = (await injectSpecContextPlugin({
+        directory: dir,
+      })) as OpenCodeSpecHooks;
+      const patchText = [
+        "*** Begin Patch",
+        "*** Update File: src/one.ts",
+        "*** Move to: src/two.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** End Patch",
+      ].join("\n");
+
+      await expect(
+        hooks["tool.execute.before"](
+          { tool: "apply_patch", sessionID: "session-b" },
+          { args: { patchText } },
+        ),
+      ).rejects.toThrow("OPEN_CODE_SPEC_RULE");
+
+      const [event] = readFileSync(join(dir, "hook-events.jsonl"), "utf-8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(event).toMatchObject({
+        hook_event_name: "PreToolUse",
+        session_id: "session-b",
+        tool_name: "apply_patch",
+        tool_input: { command: patchText },
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("maps edit filePath to the shared Edit trigger", async () => {
+    const dir = setupSpecHookFixture();
+    try {
+      const hooks = (await injectSpecContextPlugin({
+        directory: dir,
+      })) as OpenCodeSpecHooks;
+
+      await expect(
+        hooks["tool.execute.before"](
+          { tool: "edit", sessionID: "session-c" },
+          {
+            args: {
+              filePath: "src/demo.ts",
+              oldString: "wrong",
+              newString: "right",
+            },
+          },
+        ),
+      ).rejects.toThrow("OPEN_CODE_SPEC_RULE");
+
+      const [event] = readFileSync(join(dir, "hook-events.jsonl"), "utf-8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(event).toMatchObject({
+        hook_event_name: "PreToolUse",
+        session_id: "session-c",
+        tool_name: "Edit",
+        tool_input: { file_path: "src/demo.ts" },
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 interface ChatMessagePart {
   id?: string;
   sessionID?: string;
@@ -729,7 +904,10 @@ function setupTrellisProject(): string {
   const taskDir = join(dir, ".trellis", "tasks", "demo-task");
   mkdirSync(taskDir, { recursive: true });
   mkdirSync(join(dir, ".trellis", ".runtime", "sessions"), { recursive: true });
-  writeFileSync(join(taskDir, "prd.md"), "# Demo PRD\n\nGoal: verify injection.");
+  writeFileSync(
+    join(taskDir, "prd.md"),
+    "# Demo PRD\n\nGoal: verify injection.",
+  );
   writeFileSync(join(taskDir, "implement.jsonl"), "");
   writeFileSync(join(taskDir, "check.jsonl"), "");
   writeFileSync(
@@ -858,9 +1036,9 @@ describe("opencode inject-subagent-context (issue #264)", () => {
     expect(output.args.prompt).toContain("do the implementation");
     // Marker must be at the top so generated agent definitions can detect
     // successful injection via a prefix check.
-    expect(output.args.prompt.startsWith("<!-- trellis-hook-injected -->")).toBe(
-      true,
-    );
+    expect(
+      output.args.prompt.startsWith("<!-- trellis-hook-injected -->"),
+    ).toBe(true);
   });
 
   it("inlines JSONL-referenced spec content into the implement prompt", async () => {
@@ -1222,7 +1400,7 @@ describe("opencode messages.transform injection (issue #553)", () => {
     expect(notSkippedMessages[0].parts[0].text).toContain("<workflow-state>");
   });
 
-  it("inject-workflow-state.js disables the escape hatch with skip_keyword: \"\"", async () => {
+  it('inject-workflow-state.js disables the escape hatch with skip_keyword: ""', async () => {
     writeFileSync(
       join(dir, ".trellis", "config.yaml"),
       ["prompt_injection:", '  skip_keyword: ""'].join("\n"),
@@ -1257,6 +1435,118 @@ describe("opencode ephemeral transform helpers", () => {
   });
 });
 
+describe("opencode inject-workflow-state layered default (parity with Python)", () => {
+  // End-to-end parity for the personal/team default layers so the JS port
+  // cannot silently drift from common/workflow_selection.py. OpenCode plugins
+  // expose only a default export (regression #212), so we drive the real
+  // experimental.chat.messages.transform handler: with no active task the
+  // breadcrumb comes from the resolved workflow file's [workflow-state:no_task]
+  // block. Each candidate file carries a distinct marker, so the emitted
+  // breadcrumb reveals which file the layered resolver picked. (The per-task
+  // pin layer is 467's unchanged code, covered by the Python matrix.)
+  let dir: string;
+
+  const noTaskBlock = (marker: string): string =>
+    [
+      "# Workflow",
+      "",
+      "[workflow-state:no_task]",
+      marker,
+      "[/workflow-state:no_task]",
+      "",
+    ].join("\n");
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "wf-layered-js-"));
+    mkdirSync(join(dir, ".trellis", ".runtime", "sessions"), {
+      recursive: true,
+    });
+    mkdirSync(join(dir, ".trellis", "workflows"), { recursive: true });
+    writeFileSync(
+      join(dir, ".trellis", "workflow.md"),
+      noTaskBlock("GLOBAL_BREADCRUMB"),
+    );
+    writeFileSync(
+      join(dir, ".trellis", "workflows", "tdd.md"),
+      noTaskBlock("TDD_BREADCRUMB"),
+    );
+    writeFileSync(
+      join(dir, ".trellis", "workflows", "native.md"),
+      noTaskBlock("NATIVE_BREADCRUMB"),
+    );
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  async function breadcrumb(): Promise<string> {
+    const hooks = (await injectWorkflowStatePlugin({
+      directory: dir,
+    })) as TransformHooks;
+    // The breadcrumb arrives as its own synthetic part rather than being
+    // prepended to the user's text (#524), and insertSyntheticTextPart refuses
+    // to run unless an ordinary part carries a persisted identity — so the
+    // prompt has to be a realistic OpenCode part, not a bare {type,text}.
+    const latest = userTurn("user prompt");
+    const messages = [latest];
+    await hooks[MESSAGES_TRANSFORM_HOOK]({}, { messages });
+    return messages[0].parts
+      .filter((part) => part.text !== undefined)
+      .map((part) => part.text)
+      .join("\n\n");
+  }
+
+  it("no config -> global breadcrumb", async () => {
+    expect(await breadcrumb()).toContain("GLOBAL_BREADCRUMB");
+  });
+
+  it("team default routes the breadcrumb to the team variant", async () => {
+    writeFileSync(
+      join(dir, ".trellis", "config.yaml"),
+      'default_workflow: "tdd"  # team default\n',
+    );
+    const text = await breadcrumb();
+    expect(text).toContain("TDD_BREADCRUMB");
+    expect(text).not.toContain("GLOBAL_BREADCRUMB");
+  });
+
+  it("personal override outranks the team default", async () => {
+    writeFileSync(
+      join(dir, ".trellis", "config.yaml"),
+      "default_workflow: tdd\n",
+    );
+    writeFileSync(
+      join(dir, ".trellis", ".developer"),
+      "name=x\nworkflow=native\n",
+    );
+    const text = await breadcrumb();
+    expect(text).toContain("NATIVE_BREADCRUMB");
+    expect(text).not.toContain("TDD_BREADCRUMB");
+  });
+
+  it("commented default_workflow is ignored -> global breadcrumb", async () => {
+    writeFileSync(
+      join(dir, ".trellis", "config.yaml"),
+      "# default_workflow: tdd\n",
+    );
+    expect(await breadcrumb()).toContain("GLOBAL_BREADCRUMB");
+  });
+
+  it("team default naming a missing file falls through to global", async () => {
+    writeFileSync(
+      join(dir, ".trellis", "config.yaml"),
+      "default_workflow: nope\n",
+    );
+    expect(await breadcrumb()).toContain("GLOBAL_BREADCRUMB");
+  });
+
+  it(".developer with only name= is backward-safe -> global breadcrumb", async () => {
+    writeFileSync(join(dir, ".trellis", ".developer"), "name=tommy\n");
+    expect(await breadcrumb()).toContain("GLOBAL_BREADCRUMB");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Issue #441 — sub-agent context injection limits
 // ---------------------------------------------------------------------------
@@ -1279,7 +1569,7 @@ describe("opencode context injection limits (issue #441)", () => {
   function writeJsonlEntries(entries: Record<string, string>[]): void {
     writeFileSync(
       join(dir, ".trellis", "tasks", "demo-task", "implement.jsonl"),
-      entries.map(e => JSON.stringify(e)).join("\n") + "\n",
+      entries.map((e) => JSON.stringify(e)).join("\n") + "\n",
       "utf-8",
     );
   }
@@ -1439,8 +1729,7 @@ describe("opencode context injection limits (issue #441)", () => {
     });
 
     it("does not misclassify legitimate multi-byte UTF-8 content as binary", async () => {
-      const multiByteContent =
-        "emoji: 🎉🚀 cjk: 中文测试 bmp: café naïve\n";
+      const multiByteContent = "emoji: 🎉🚀 cjk: 中文测试 bmp: café naïve\n";
       writeFileSync(join(dir, "multibyte.md"), multiByteContent, "utf-8");
       writeJsonlEntries([{ file: "multibyte.md", reason: "unicode spec" }]);
 
@@ -1596,7 +1885,11 @@ describe("opencode context injection limits (issue #441)", () => {
       mkdirSync(join(dir, "refdir"), { recursive: true });
       writeFileSync(join(dir, "refdir", "a.md"), "A".repeat(1000), "utf-8");
       writeFileSync(join(dir, "refdir", "b.md"), "B".repeat(1000), "utf-8");
-      writeFileSync(join(dir, "refdir", "c.txt"), "IGNORED_TXT_CONTENT", "utf-8");
+      writeFileSync(
+        join(dir, "refdir", "c.txt"),
+        "IGNORED_TXT_CONTENT",
+        "utf-8",
+      );
       writeJsonlEntries([
         { file: "refdir/", type: "directory", reason: "reference dir" },
       ]);

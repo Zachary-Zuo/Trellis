@@ -16,6 +16,11 @@
  *
  * - `--create-new`: never touches `.trellis/workflow.md`; writes
  *   `.trellis/workflow.md.new` and leaves the hash file alone.
+ *
+ * - `--save <id>`: resolves a template through the same pipeline but writes it
+ *   to the per-task variant library (`.trellis/workflows/<id>.md`) instead of
+ *   the active workflow. Library files are user-managed by definition: this
+ *   path never touches `.trellis/workflow.md` or `.template-hashes.json`.
  */
 
 import fs from "node:fs";
@@ -40,6 +45,7 @@ import {
   type ResolvedWorkflowTemplate,
   type WorkflowTemplateListing,
 } from "../utils/workflow-resolver.js";
+import { writeFileAtomic } from "../utils/atomic-write.js";
 
 export interface WorkflowCommandOptions {
   template?: string;
@@ -47,10 +53,37 @@ export interface WorkflowCommandOptions {
   list?: boolean;
   force?: boolean;
   createNew?: boolean;
+  save?: string;
 }
+
+export interface CreateWorkflowOptions {
+  skipDefaults?: boolean;
+}
+
+/**
+ * Per-task workflow variant library. Files here are user-managed: never
+ * hash-tracked, never touched by `trellis update` (same ownership stance as a
+ * non-native `.trellis/workflow.md`).
+ */
+const WORKFLOWS_LIB_REL = `${DIR_NAMES.WORKFLOW}/workflows`;
+
+/**
+ * Library id charset — must match the per-task resolution rule in the runtime
+ * consumers (`common/workflow_selection.py`) so a saved id is resolvable and
+ * cannot traverse paths.
+ */
+const WORKFLOW_ID_RE = /^[A-Za-z0-9_-]+$/;
 
 function workflowFilePath(cwd: string): string {
   return path.join(cwd, PATHS.WORKFLOW_GUIDE_FILE);
+}
+
+function workflowsLibraryDir(cwd: string): string {
+  return path.join(cwd, WORKFLOWS_LIB_REL);
+}
+
+function workflowLibraryPath(cwd: string, id: string): string {
+  return path.join(workflowsLibraryDir(cwd), `${id}.md`);
 }
 
 function isInteractive(): boolean {
@@ -68,6 +101,26 @@ function printListing(templates: WorkflowTemplateListing[]): void {
     if (t.description) {
       console.log(chalk.gray(`    ${t.description}`));
     }
+  }
+  console.log("");
+}
+
+/**
+ * `--list` addition: ids already saved to the per-task variant library on
+ * disk. Skipped entirely when the directory is absent or empty.
+ */
+function printLibraryListing(cwd: string): void {
+  const libDir = workflowsLibraryDir(cwd);
+  if (!fs.existsSync(libDir)) return;
+  const ids = fs
+    .readdirSync(libDir)
+    .filter((f) => f.endsWith(".md"))
+    .map((f) => f.slice(0, -".md".length))
+    .sort();
+  if (ids.length === 0) return;
+  console.log(chalk.cyan(`Library (${WORKFLOWS_LIB_REL}/):\n`));
+  for (const id of ids) {
+    console.log(`  ${chalk.green(id)}`);
   }
   console.log("");
 }
@@ -228,6 +281,231 @@ async function writeWorkflow(
 }
 
 /**
+ * The six breadcrumb statuses used by the bundled native template. Kept in
+ * sync with `.trellis/spec/cli/backend/workflow-state-contract.md` (status
+ * writer + reachability tables) — update both together.
+ */
+const REQUIRED_WORKFLOW_STATE_IDS = [
+  "no_task",
+  "planning",
+  "planning-inline",
+  "in_progress",
+  "in_progress-inline",
+  "completed",
+];
+
+/**
+ * Soft parser-contract validation for saved library variants: warn (never
+ * block) when runtime markers that SessionStart / per-turn hooks and
+ * `get_context.py --mode phase` rely on are missing. Warnings go to stderr —
+ * stdout stays reserved for command output.
+ */
+function warnAboutMissingMarkers(content: string, relPath: string): void {
+  const problems: string[] = [];
+  if (!content.includes("## Phase Index")) {
+    problems.push('missing "## Phase Index" section');
+  }
+  if (!/^#### \d+\.\d+/m.test(content)) {
+    problems.push('no "#### X.Y" step heading');
+  }
+  const missingStates = REQUIRED_WORKFLOW_STATE_IDS.filter(
+    (id) => !content.includes(`[workflow-state:${id}]`),
+  );
+  if (missingStates.length > 0) {
+    problems.push(
+      `missing [workflow-state:*] blocks: ${missingStates.join(", ")}`,
+    );
+  }
+  if (problems.length === 0) return;
+  process.stderr.write(
+    chalk.yellow(
+      `\n⚠ ${relPath} is missing runtime parser markers:\n` +
+        problems.map((p) => `  - ${p}\n`).join("") +
+        "  Consumers degrade to generic breadcrumbs / partial phase detail where markers are absent.\n",
+    ),
+  );
+}
+
+/**
+ * `--save <id>`: resolve through the same template pipeline as `--template`
+ * and write to the per-task variant library. Never touches
+ * `.trellis/workflow.md` or `.template-hashes.json` — library files are
+ * user-managed by definition.
+ */
+async function saveWorkflowToLibrary(
+  cwd: string,
+  id: string,
+  options: WorkflowCommandOptions,
+): Promise<void> {
+  if (!WORKFLOW_ID_RE.test(id)) {
+    throw new WorkflowCommandError(
+      `Invalid workflow id "${id}". Library ids must match [A-Za-z0-9_-]+ so per-task resolution can find the saved file.`,
+    );
+  }
+
+  let template: ResolvedWorkflowTemplate;
+  try {
+    template = await resolveWorkflowTemplate(id, {
+      source: options.marketplace,
+    });
+  } catch (err) {
+    if (err instanceof WorkflowResolveError) {
+      throw new WorkflowCommandError(err.message);
+    }
+    throw err;
+  }
+
+  const libDir = workflowsLibraryDir(cwd);
+  const destPath = path.join(libDir, `${id}.md`);
+  const destRel = `${WORKFLOWS_LIB_REL}/${id}.md`;
+  if (fs.existsSync(destPath) && !options.force) {
+    throw new WorkflowCommandError(
+      `${destRel} already exists. Re-run with --force to overwrite.`,
+    );
+  }
+  if (!fs.existsSync(libDir)) {
+    fs.mkdirSync(libDir, { recursive: true });
+  }
+  const finalContent = replacePythonCommandLiterals(template.content);
+  fs.writeFileSync(destPath, finalContent, "utf-8");
+  console.log(chalk.green(`  ✓ Saved "${template.id}" to ${destRel}`));
+
+  warnAboutMissingMarkers(finalContent, destRel);
+}
+
+function setProjectDefaultWorkflow(cwd: string, id: string): void {
+  const configPath = path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml");
+  if (!fs.existsSync(configPath)) {
+    throw new WorkflowCommandError(
+      `Cannot set the project default because ${DIR_NAMES.WORKFLOW}/config.yaml is missing.`,
+    );
+  }
+
+  const content = fs.readFileSync(configPath, "utf-8");
+  const line = `default_workflow: ${id}`;
+  let next: string;
+  if (/^default_workflow\s*:/m.test(content)) {
+    next = content.replace(/^default_workflow\s*:.*$/m, line);
+  } else if (/^#\s*default_workflow\s*:/m.test(content)) {
+    next = content.replace(/^#\s*default_workflow\s*:.*$/m, line);
+  } else {
+    next = `${content.trimEnd()}\n\n${line}\n`;
+  }
+  writeFileAtomic(configPath, next);
+}
+
+function setPersonalDefaultWorkflow(cwd: string, id: string): void {
+  const developerPath = path.join(cwd, PATHS.DEVELOPER_FILE);
+  if (!fs.existsSync(developerPath)) {
+    throw new WorkflowCommandError(
+      `Cannot set the personal default because ${PATHS.DEVELOPER_FILE} is missing. Run \`trellis init -u <name>\` first.`,
+    );
+  }
+
+  const content = fs.readFileSync(developerPath, "utf-8");
+  const line = `workflow=${id}`;
+  const next = /^workflow=.*$/m.test(content)
+    ? content.replace(/^workflow=.*$/m, line)
+    : `${content.trimEnd()}\n${line}\n`;
+  writeFileAtomic(developerPath, next);
+}
+
+async function chooseWorkflowDefaults(id: string): Promise<{
+  projectDefault: boolean;
+  personalDefault: boolean;
+}> {
+  const { projectDefault } = await inquirer.prompt<{
+    projectDefault: boolean;
+  }>([
+    {
+      type: "confirm",
+      name: "projectDefault",
+      message: `Set "${id}" as the project default in .trellis/config.yaml?`,
+      default: false,
+    },
+  ]);
+  const { personalDefault } = await inquirer.prompt<{
+    personalDefault: boolean;
+  }>([
+    {
+      type: "confirm",
+      name: "personalDefault",
+      message: `Set "${id}" as your personal default in .trellis/.developer?`,
+      default: false,
+    },
+  ]);
+  return { projectDefault, personalDefault };
+}
+
+/**
+ * Create a user-managed workflow variant from the bundled native workflow.
+ *
+ * Reusing native keeps every parser-sensitive heading, platform marker, and
+ * workflow-state block intact without maintaining a second scaffold template.
+ * The global `.trellis/workflow.md` and its hash entry are never changed.
+ */
+export async function runCreateWorkflowCommand(
+  id: string,
+  options: CreateWorkflowOptions = {},
+): Promise<void> {
+  const cwd = process.cwd();
+  if (!fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW))) {
+    throw new WorkflowCommandError(
+      "No .trellis/ directory found. Run `trellis init` first.",
+    );
+  }
+  if (!WORKFLOW_ID_RE.test(id)) {
+    throw new WorkflowCommandError(
+      `Invalid workflow id "${id}". Workflow ids must match [A-Za-z0-9_-]+.`,
+    );
+  }
+
+  const destPath = workflowLibraryPath(cwd, id);
+  const destRel = `${WORKFLOWS_LIB_REL}/${id}.md`;
+  if (fs.existsSync(destPath)) {
+    throw new WorkflowCommandError(
+      `${destRel} already exists. Choose another workflow id or edit the existing file.`,
+    );
+  }
+
+  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  const native = await resolveWorkflowTemplate(NATIVE_WORKFLOW_ID);
+  writeFileAtomic(destPath, replacePythonCommandLiterals(native.content));
+  console.log(chalk.green(`  ✓ Created ${destRel} from the native workflow`));
+
+  if (options.skipDefaults || !isInteractive()) return;
+
+  const defaults = await chooseWorkflowDefaults(id);
+  if (
+    defaults.projectDefault &&
+    !fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml"))
+  ) {
+    throw new WorkflowCommandError(
+      `Created ${destRel}, but cannot set the project default because ${DIR_NAMES.WORKFLOW}/config.yaml is missing.`,
+    );
+  }
+  if (
+    defaults.personalDefault &&
+    !fs.existsSync(path.join(cwd, PATHS.DEVELOPER_FILE))
+  ) {
+    throw new WorkflowCommandError(
+      `Created ${destRel}, but cannot set the personal default because ${PATHS.DEVELOPER_FILE} is missing. Run \`trellis init -u <name>\` first.`,
+    );
+  }
+
+  if (defaults.projectDefault) {
+    setProjectDefaultWorkflow(cwd, id);
+    console.log(
+      chalk.green(`  ✓ Set default_workflow: ${id} in .trellis/config.yaml`),
+    );
+  }
+  if (defaults.personalDefault) {
+    setPersonalDefaultWorkflow(cwd, id);
+    console.log(chalk.green(`  ✓ Set workflow=${id} in .trellis/.developer`));
+  }
+}
+
+/**
  * Distinct error class so `cli/index.ts` can format these as user errors
  * without dumping stack traces.
  */
@@ -254,9 +532,22 @@ export async function runWorkflowCommand(
       source: options.marketplace,
     });
     printListing(templates);
+    printLibraryListing(cwd);
     if (errorMessage) {
       console.log(chalk.yellow(`⚠ ${errorMessage}`));
     }
+    return;
+  }
+
+  // `--save <id>` populates the per-task variant library; it never composes
+  // with the active-workflow write modes.
+  if (options.save !== undefined) {
+    if (options.template || options.createNew) {
+      throw new WorkflowCommandError(
+        "--save cannot be combined with --template or --create-new.",
+      );
+    }
+    await saveWorkflowToLibrary(cwd, options.save, options);
     return;
   }
 

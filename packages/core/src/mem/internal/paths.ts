@@ -22,6 +22,19 @@ export const ZCODE_DB = path.join(HOME, ".zcode", "cli", "db", "db.sqlite");
 export const GROK_SESSIONS = path.join(HOME, ".grok", "sessions");
 
 /**
+ * DeepSeek Harness session root: `$DSH_HOME/sessions`, falling back to
+ * `~/.dsh/sessions`. Layout is
+ * `<cwd-group>/<session-id>/session.<generation>.jsonl.zstd`.
+ *
+ * Read per call rather than at module load so a caller (or test) that sets
+ * `DSH_HOME` sees its own value, matching `opencodeDataDir` / `devinCliDataDir`.
+ */
+export function dshSessionsDir(): string {
+  const home = process.env.DSH_HOME?.trim();
+  return path.join(home && home.length > 0 ? home : path.join(HOME, ".dsh"), "sessions");
+}
+
+/**
  * OpenCode's data root: `$XDG_DATA_HOME/opencode`, falling back to
  * `~/.local/share/opencode`.
  *

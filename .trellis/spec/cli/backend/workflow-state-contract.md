@@ -21,8 +21,9 @@ main session will silently skip them. Prior bugs around planning gates and
 Phase 3.4 commit reminders hit exactly this failure mode.
 
 This document is the source of truth for the runtime mechanics. The user-facing
-breadcrumb body lives in `.trellis/workflow.md`; this spec covers everything
-**around** it (parsers, writers, lifecycle, reachability).
+breadcrumb body lives in `.trellis/workflow.md` — or in the active task's
+selected variant file (see "Per-task workflow resolution" below); this spec
+covers everything **around** it (parsers, writers, lifecycle, reachability).
 
 ---
 
@@ -76,8 +77,9 @@ Both regexes MUST use the `\1` backreference variant — `[workflow-state:([A-Za
    the task directory exists but `task.json` is missing, malformed, or has no
    usable status, the hook emits the `task_error` pseudo-status and keeps the
    task directory name in the breadcrumb header.
-5. It opens `.trellis/workflow.md` and parses every `[workflow-state:STATUS]`
-   block.
+5. It resolves the workflow file (per-task resolution order below: the
+   active task's `.trellis/workflows/<id>.md` when selected, else
+   `.trellis/workflow.md`) and parses every `[workflow-state:STATUS]` block.
 6. Codex may map `planning` / `in_progress` to `planning-inline` /
    `in_progress-inline` based on `codex.dispatch_mode`; all other platforms
    use the plain status.
@@ -108,8 +110,75 @@ Both regexes MUST use the `\1` backreference variant — `[workflow-state:([A-Za
    When adding a new hook-capable platform whose per-turn event name is not
    `UserPromptSubmit`, extend `_detect_platform()` and the `hook_event_name`
    selector in `inject-workflow-state.py` (and the OpenCode `.js` plugin if
-   the new platform shares its transform envelope). Do NOT hardcode
-   `UserPromptSubmit` at any new emission site.
+   the new platform shares its transform envelope). Do NOT
+   hardcode `UserPromptSubmit` at any new emission site.
+
+---
+
+## Per-task workflow resolution
+
+`.trellis/workflow.md` is the **global** workflow. A task may pin a variant
+by storing `"workflow": "<id>"` in its task.json (writers: `task.py create
+--workflow <id>`, `task.py workflow <id>` / `--clear`); variant bodies live
+in the user-managed library `.trellis/workflows/<id>.md`, populated by
+`trellis workflow --save <id>` (see `commands-workflow.md`). Every runtime
+consumer of workflow markdown resolves the path with the same rule, whose
+single source is `.trellis/scripts/common/workflow_selection.py`. It is a
+**precedence chain**, highest to lowest — each layer maps an id to
+`.trellis/workflows/<id>.md` and falls through when the id is unset, invalid
+(fails `^[A-Za-z0-9_-]+$`), or names a missing file:
+
+1. **Per-task pin** — active task's task.json `workflow` (session-bound,
+   explicit; writers: `task.py create --workflow <id>`, `task.py workflow
+   <id>` / `--clear`). An invalid id or missing variant file emits one warning
+   line on **stderr** (never stdout — stdout is hook JSON) and then falls
+   through to the default chain below (it does not abort to global).
+2. **Personal override** — `.developer` `workflow=<id>` line. The `.developer`
+   file is gitignored and per-developer, so this is a local, un-committed
+   override that outranks the team default. Silent on miss (a default, not an
+   explicit per-task choice — a per-turn warning would be noise).
+3. **Team default** — config.yaml `default_workflow: <id>` (top-level key).
+   Committed, so the whole team shares it. Silent on miss.
+4. **Global** — `.trellis/workflow.md`.
+
+With neither a per-task pin nor the personal/team keys set, resolution is
+byte-identical to reading the global `.trellis/workflow.md` (the pre-feature
+behavior).
+
+> **Precedence provenance (2026-07-23 colleague transcript)**: the personal >
+> team layering and "personal not in git, higher priority" come directly from
+> the transcript (16:44:23 team-shared config default; 16:44:39 personal layer,
+> not uploaded to git, higher priority). The implementation stores the personal
+> id in the existing gitignored `.developer` key-value file and places an
+> explicit per-task pin above that developer-wide default. See task
+> `07-24-workflow-config-default/prd.md`.
+
+The resolver never raises. The hooks additionally wrap the
+`common.workflow_selection` import itself in try/except and fall back to the
+global path (older installed projects may not ship the module; hooks must
+never crash the session).
+
+Consumers that resolve per-task:
+
+| Consumer | Serves |
+|---|---|
+| `shared-hooks/session-start.py` (`_resolve_workflow_md`) | SessionStart Phase Index (`<trellis-workflow>` block) |
+| `shared-hooks/inject-workflow-state.py` (`load_breadcrumbs`) | per-turn `[workflow-state:*]` breadcrumb bodies |
+| `scripts/common/workflow_phase.py` (`get_context.py --mode phase`) | phase/step detail bodies |
+| `opencode/plugins/inject-workflow-state.js` (`resolveWorkflowMd`) | per-turn breadcrumbs (JS port; mirrors the Python rule for the same inputs) |
+| `pi/extensions/trellis/index.ts.txt` (`resolveWorkflowMd`) | per-turn breadcrumbs (TS port; mirrors the Python rule for the same inputs) |
+| `codex/hooks/session-start.py` + `copilot/hooks/session-start.py` (`_resolve_workflow_md`) | platform-specific SessionStart Phase Index TOC |
+
+Known degradation: the OMP extension keeps injecting the global
+`.trellis/workflow.md` regardless of per-task, personal, or team selection.
+Parity there is a tracked follow-up.
+
+Absent a per-task pin **and** the personal/team default keys, every consumer
+resolves to the global `.trellis/workflow.md` — output is byte-identical to a
+project without the feature.
+Variant files must satisfy the same parser contract as `workflow.md` (marker
+syntax above, `## Phase Index`, `#### X.Y` step headings, platform markers);
+`trellis workflow --save` warns at save time when markers are missing.
 
 ---
 
@@ -225,7 +294,8 @@ tag is absent, the hook degrades to the generic line — visible to the user as
 an obvious bug they can fix, rather than being silently masked.
 
 To customize breadcrumb wording, edit the `[workflow-state:STATUS]` block in
-`.trellis/workflow.md`. No script change required.
+`.trellis/workflow.md` (or in the task's selected variant file). No script
+change required.
 
 ### Update boundary
 
@@ -257,8 +327,8 @@ a new writer requires updating this spec.**
 | # | Writer | File:Line | Value | Trigger |
 |---|--------|-----------|-------|---------|
 | 1 | `cmd_create` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:206` | `"planning"` | `task.py create "<title>"` (also visibly auto-sets the session active-task pointer when session identity is available; `--no-start` skips pointer movement for backlog batching — see R7 in 04-30-workflow-state-commit-gap PRD) |
-| 2 | `_record_start_state` (called from both `cmd_start` branches) | `packages/cli/src/templates/trellis/scripts/task.py:111` | `"in_progress"` (gated on prior `"planning"`; the same write also records `task.json.branch` when empty) | `task.py start <dir>` |
-| 3 | `cmd_archive` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:1275` | `"completed"` (flip + archive `mv`, but only after `_validate_branch_metadata` passes) | `task.py archive <dir>` |
+| 2 | `cmd_start` | `packages/cli/src/templates/trellis/scripts/task.py:114-115, 128-129` | `"in_progress"` (gated on prior `"planning"`; both branches in `cmd_start`) | `task.py start <dir>` |
+| 3 | `cmd_archive` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:337` | `"completed"` (unconditional flip + archive `mv`) | `task.py archive <dir>` |
 | 4 | `emptyTaskJson` factory | `packages/cli/src/utils/task-json.ts:54` | `"planning"` (default) | TS callers (init, update) |
 | 5 | `getBootstrapTaskJson` | `packages/cli/src/commands/init.ts:535` | `"in_progress"` (override) | `trellis init` (creator path) |
 | 6 | `getJoinerTaskJson` | `packages/cli/src/commands/init.ts:587` | `"in_progress"` (override) | `trellis init` (joiner path) |
@@ -296,7 +366,6 @@ Which breadcrumbs actually fire in normal flow:
 | Status | Reachability | Notes |
 |--------|--------------|-------|
 | `no_task` | ✅ reachable | Pseudo-status; emitted when `resolve_active_task()` returns no pointer. |
-| `task_error` | ✅ reachable | Pseudo-status; emitted when a session task pointer resolves to a directory whose `task.json` cannot be read or has no usable `status`. |
 | `planning` | ✅ reachable | After `cmd_create` (which now auto-sets the session pointer when available) and before `cmd_start`. `planning-inline` is the Codex inline-mode breadcrumb body for the same task status. |
 | `in_progress` | ✅ reachable | After `cmd_start`, until `cmd_archive`. `in_progress-inline` is the Codex inline-mode breadcrumb body for the same task status. |
 | `completed` | ❌ DEAD in normal flow | `cmd_archive` writes `status="completed"` and immediately moves the task dir to `archive/`. The session-pointer cleanup in `clear_task_from_sessions` runs before the move, so the resolver loses the pointer in the same call. The block body in workflow.md is preserved for a future status-transition redesign (e.g. an explicit `in_progress → completed` command) but no current code path produces it. |
@@ -394,6 +463,8 @@ nested Trellis sub-agents.
 ## Mandatory triggers (must update this spec when changing)
 
 - Marker syntax (regex / charset)
+- Per-task resolution rule change (`workflow_selection` resolution order, id
+  charset, or the per-task consumer list above)
 - Hook script structural change (parser, output envelope, what reads
   `task.json.status`)
 - `workflow.md` update semantics in `trellis update`

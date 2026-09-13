@@ -49,6 +49,9 @@ export function collectGeminiTemplates(): Map<string, string> {
   for (const [k, v] of collectSharedHooks(".gemini/hooks", "gemini")) {
     files.set(k, v);
   }
-  files.set(".gemini/settings.json", resolvePlaceholders(getSettingsTemplate()));
+  files.set(
+    ".gemini/settings.json",
+    resolvePlaceholders(getSettingsTemplate()),
+  );
   return files;
 }
