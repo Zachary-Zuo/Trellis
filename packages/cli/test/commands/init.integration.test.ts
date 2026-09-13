@@ -1027,19 +1027,34 @@ describe("init() integration", () => {
     expect(fs.existsSync(path.join(tmpDir, DIR_NAMES.WORKFLOW))).toBe(false);
   });
 
-  it("#7d renders the platform Python command into generated config and logs the adaptation", async () => {
+  it("#7d renders the platform Python command into generated files and logs the adaptation", async () => {
     const expectedPythonCmd =
       process.platform === "win32" ? "python" : "python3";
 
     await init({ yes: true, claude: true });
 
+    // Hook commands are platform-neutral: they go through the Node launcher
+    // instead of naming an interpreter, so `.claude/settings.json` is identical
+    // on every OS and keeps working when the repo is cloned elsewhere.
     const settings = fs.readFileSync(
       path.join(tmpDir, ".claude", "settings.json"),
       "utf-8",
     );
     expect(settings).toContain(
-      `"${expectedPythonCmd} .claude/hooks/session-start.py"`,
+      '"node .trellis/scripts/run-python-hook.cjs .claude/hooks/session-start.py"',
     );
+    expect(settings).not.toContain("{{PYTHON_CMD}}");
+
+    // The platform command still lands wherever a Python invocation is
+    // documented, e.g. the workflow guide.
+    const workflow = fs.readFileSync(
+      path.join(tmpDir, DIR_NAMES.WORKFLOW, "workflow.md"),
+      "utf-8",
+    );
+    expect(workflow).toContain(
+      `${expectedPythonCmd} ./.trellis/scripts/get_context.py`,
+    );
+
     expect(console.log).toHaveBeenCalledWith(
       expect.stringContaining(
         `Trellis rendered Python commands as "${expectedPythonCmd}" in generated hooks, settings, and help text`,

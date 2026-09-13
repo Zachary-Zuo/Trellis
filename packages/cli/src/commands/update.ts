@@ -954,9 +954,11 @@ async function collectTemplateFiles(
     }
   }
 
-  // Apply python3→python replacement for Windows consistency with init-time writes
+  // Apply python3→python replacement for Windows consistency with init-time writes.
+  // The path is passed so launcher templates can opt out; see
+  // isPythonRewriteExempt in configurators/shared.ts.
   for (const [filePath, content] of files) {
-    files.set(filePath, replacePythonCommandLiterals(content));
+    files.set(filePath, replacePythonCommandLiterals(content, filePath));
   }
 
   return files;

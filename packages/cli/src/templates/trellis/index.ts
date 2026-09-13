@@ -76,6 +76,10 @@ export const taskScript = readTemplate("scripts/task.py");
 export const getContextScript = readTemplate("scripts/get_context.py");
 export const addSessionScript = readTemplate("scripts/add_session.py");
 
+// Node launcher that hook commands invoke instead of naming an interpreter.
+// Written verbatim — see `isPythonRewriteExempt`.
+export const runPythonHookScript = readTemplate("scripts/run-python-hook.cjs");
+
 // Configuration files
 export const workflowMdTemplate = readTemplate("workflow.md");
 export const configYamlTemplate = readTemplate("config.yaml");
@@ -130,6 +134,9 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("task.py", taskScript);
   scripts.set("get_context.py", getContextScript);
   scripts.set("add_session.py", addSessionScript);
+
+  // Node launcher for hook commands; no extension rewriting (see shared.ts).
+  scripts.set("run-python-hook.cjs", runPythonHookScript);
 
   return scripts;
 }

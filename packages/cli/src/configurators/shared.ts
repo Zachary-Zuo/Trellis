@@ -65,6 +65,25 @@ export function getPythonCommandForPlatform(
 }
 
 /**
+ * Template paths whose bytes must survive the `python3` rewrite untouched.
+ *
+ * The rewrite exists to make *documented* Python invocations match the host
+ * platform. A launcher that chooses the interpreter itself at run time is the
+ * opposite case: it ships a platform-neutral command and names several
+ * candidate interpreters in code. Rewriting `python3` inside it deletes the
+ * POSIX candidate the moment the repository is materialized on Windows, so a
+ * repo authored on Windows and cloned on Linux would find no interpreter at
+ * all — the exact failure the launcher exists to prevent.
+ *
+ * Deliberately path-based and narrow: the only exempt file is the hook
+ * launcher, which no other template depends on.
+ */
+export function isPythonRewriteExempt(relativePath: string): boolean {
+  const posix = relativePath.replace(/\\/g, "/");
+  return posix.endsWith("scripts/run-python-hook.cjs");
+}
+
+/**
  * Replace literal `python3` with the resolved Python command, excluding
  * shebang lines.
  *
@@ -74,8 +93,18 @@ export function getPythonCommandForPlatform(
  *
  * No-op when the resolved command is `python3` (the template default).
  * Idempotent: running it twice produces the same result.
+ *
+ * Pass `relativePath` at write sites so a launcher template can opt out via
+ * {@link isPythonRewriteExempt}; callers that only render placeholders keep the
+ * legacy path-less behavior.
  */
-export function replacePythonCommandLiterals(content: string): string {
+export function replacePythonCommandLiterals(
+  content: string,
+  relativePath?: string,
+): string {
+  if (relativePath !== undefined && isPythonRewriteExempt(relativePath)) {
+    return content;
+  }
   const target = getPythonCommandForPlatform();
   if (target === "python3") return content;
   return content

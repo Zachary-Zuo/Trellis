@@ -6,7 +6,18 @@ export default [
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,
   {
-    ignores: ["dist/**", "node_modules/**", "*.js", "scripts/**"],
+    // Shipped template assets and build scripts are not sources: the launcher
+    // under `src/templates/**` and the build scripts run in Node (and in the
+    // user's project) verbatim, so linting them as sources reports Node globals
+    // as undefined. `**/` is required — a bare `*.js` only matches this
+    // directory in flat-config glob semantics.
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "**/*.js",
+      "**/*.cjs",
+      "scripts/**",
+    ],
   },
   {
     files: ["src/**/*.ts"],

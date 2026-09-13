@@ -61,8 +61,14 @@ const {
   configurePlatform,
 } = await import("../../src/configurators/index.js");
 const { setWriteMode } = await import("../../src/utils/file-writer.js");
-const { resetResolvedPythonCommand, setResolvedPythonCommand } = await import(
-  "../../src/configurators/shared.js"
+const {
+  isPythonRewriteExempt,
+  replacePythonCommandLiterals,
+  resetResolvedPythonCommand,
+  setResolvedPythonCommand,
+} = await import("../../src/configurators/shared.js");
+const { runPythonHookScript } = await import(
+  "../../src/templates/trellis/index.js"
 );
 
 /** The previously-raw write sites, one file each. */
@@ -118,5 +124,63 @@ describe("python3 rewrite reaches the previously-raw write sites", () => {
         collectPlatformTemplates(id)?.get(relPath),
       );
     }
+  });
+});
+
+/**
+ * The hook launcher is the one template that must survive the rewrite byte for
+ * byte. It ships as a platform-neutral command (`node .../run-python-hook.cjs`)
+ * and names its own interpreter candidates in code, so rewriting `python3`
+ * inside it would delete the POSIX candidate as soon as the repo is written on
+ * Windows — a repo authored on Windows and cloned on Linux would then find no
+ * interpreter at all, which is the failure the launcher exists to prevent.
+ */
+describe("hook launcher is exempt from the python3 rewrite", () => {
+  afterEach(() => {
+    resetResolvedPythonCommand();
+  });
+
+  it("names the launcher, and only the launcher", () => {
+    expect(isPythonRewriteExempt(".trellis/scripts/run-python-hook.cjs")).toBe(
+      true,
+    );
+    // Also true for the absolute destination path `copyDirRecursive` passes.
+    expect(
+      isPythonRewriteExempt("D:\\proj\\.trellis\\scripts\\run-python-hook.cjs"),
+    ).toBe(true);
+    expect(
+      isPythonRewriteExempt(".trellis/scripts/common/task_store.py"),
+    ).toBe(false);
+    expect(isPythonRewriteExempt(".claude/settings.json")).toBe(false);
+  });
+
+  it("ships both platform candidate lists", () => {
+    expect(runPythonHookScript).toContain('"python3"');
+    expect(runPythonHookScript).toContain('"py"');
+  });
+
+  it("returns the launcher unchanged under Windows rendering", () => {
+    setResolvedPythonCommand("python");
+    expect(
+      replacePythonCommandLiterals(
+        runPythonHookScript,
+        ".trellis/scripts/run-python-hook.cjs",
+      ),
+    ).toBe(runPythonHookScript);
+  });
+
+  it("still rewrites a non-exempt path under Windows rendering", () => {
+    setResolvedPythonCommand("python");
+    expect(
+      replacePythonCommandLiterals(
+        "run `python3 ./x.py`\n",
+        ".trellis/scripts/common/task_store.py",
+      ),
+    ).toBe("run `python ./x.py`\n");
+  });
+
+  it("keeps the path-less legacy behavior", () => {
+    setResolvedPythonCommand("python");
+    expect(replacePythonCommandLiterals("python3 .\n")).toBe("python .\n");
   });
 });

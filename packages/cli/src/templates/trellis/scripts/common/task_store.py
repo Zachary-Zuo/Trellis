@@ -300,27 +300,39 @@ def _parse_meta_pairs(pairs: list[str] | None) -> dict[str, str] | None:
 
 def _default_prd_content(title: str, description: str | None = None) -> str:
     """Return the default PRD skeleton created with every task."""
-    goal = (description or "").strip() or "TBD."
+    goal = (description or "").strip() or "待补充。"
     heading = title.strip() or "Untitled task"
     return f"""# {heading}
 
-## Goal
+## 目标
 
 {goal}
 
-## Requirements
+## 背景
 
-- TBD
+- 待补充。
 
-## Acceptance Criteria
+## 需求
 
-- [ ] TBD
+- 待补充。
 
-## Notes
+## 约束
 
-- Keep `prd.md` focused on requirements, constraints, and acceptance criteria.
-- Lightweight tasks can remain PRD-only.
-- For complex tasks, add `design.md` for technical design and `implement.md` for execution planning before `task.py start`.
+- 待补充。
+
+## 验收标准
+
+- [ ] 待补充。
+
+## 未决问题
+
+- 暂无。
+
+## 说明
+
+- Trellis task 的 title、slug 和目录名使用英文；本文件正文使用中文。
+- `prd.md` 只写目标、背景、需求、约束、验收标准和未决问题，不写技术实现清单。
+- 轻量任务可以只保留 PRD；复杂任务在 `task.py start` 前必须补 `design.md` 和 `implement.md`。
 """
 
 
@@ -714,25 +726,26 @@ def cmd_create(args: argparse.Namespace) -> int:
     print(colored(f"Created task: {dir_name}", Colors.GREEN), file=sys.stderr)
     print("", file=sys.stderr)
     print(colored("Next steps:", Colors.BLUE), file=sys.stderr)
-    print("  - Fill prd.md with requirements and acceptance criteria", file=sys.stderr)
-    print("  - Lightweight task: PRD-only is valid", file=sys.stderr)
-    print("  - Complex task: add design.md and implement.md before task.py start", file=sys.stderr)
+    print("  - Use an English title/slug/path; write task artifact bodies in Chinese", file=sys.stderr)
+    print("  - 在 prd.md 中补齐需求、约束和验收标准", file=sys.stderr)
+    print("  - 轻量任务可以只保留 PRD", file=sys.stderr)
+    print("  - 复杂任务在 task.py start 前补 design.md 和 implement.md", file=sys.stderr)
     if created_jsonl:
         print(
-            "  - Curate implement.jsonl / check.jsonl (created empty) as spec/research "
-            "manifests before task.py start when sub-agents need context:",
+            "  - 子代理需要上下文时，在 task.py start 前整理 implement.jsonl / check.jsonl "
+            "（创建时为空）的 spec/research 清单：",
             file=sys.stderr,
         )
         print(
-            '      one JSON object per line — {"file": "<path>", "reason": "<why>"}; '
-            "spec/research docs only, no code paths",
+            '      每行一个 JSON 对象 — {"file": "<path>", "reason": "<why>"}；'
+            "只放 spec/research 文档，不放代码路径",
             file=sys.stderr,
         )
         print(
-            "      list available specs: python3 .trellis/scripts/get_context.py --mode packages",
+            "      可用 spec 列表：python3 .trellis/scripts/get_context.py --mode packages",
             file=sys.stderr,
         )
-    print("  - Use /trellis:continue or phase context to decide the next step", file=sys.stderr)
+    print("  - 使用 /trellis:continue 或 phase context 判断下一步", file=sys.stderr)
     print("", file=sys.stderr)
 
     # Output relative path for script chaining

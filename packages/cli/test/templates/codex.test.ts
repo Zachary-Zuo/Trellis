@@ -110,6 +110,20 @@ describe("codex native sub-agent hooks", () => {
     expect(config.hooks.PreToolUse[0]?.hooks[0]?.command).toContain(
       ".codex/hooks/inject-spec-context.py",
     );
+
+    // Every hook command goes through the Node launcher rather than naming a
+    // Python interpreter, so the committed command is identical on every
+    // platform and `{{PYTHON_CMD}}` no longer appears in this file.
+    const commands = [
+      config.hooks.UserPromptSubmit[0]?.hooks[0]?.command,
+      subagentStart?.hooks[0]?.command,
+      config.hooks.SessionStart[0]?.hooks[0]?.command,
+      config.hooks.PreToolUse[0]?.hooks[0]?.command,
+    ];
+    for (const command of commands) {
+      expect(command).toContain("node .trellis/scripts/run-python-hook.cjs");
+      expect(command).not.toContain("{{PYTHON_CMD}}");
+    }
   });
 });
 

@@ -9,7 +9,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/session-start.py",
+            "command": "node .trellis/scripts/run-python-hook.cjs .claude/hooks/session-start.py",
             "timeout": 30
           }
         ]
@@ -19,12 +19,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/session-start.py",
+            "command": "node .trellis/scripts/run-python-hook.cjs .claude/hooks/session-start.py",
             "timeout": 30
           },
           {
             "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/inject-spec-context.py",
+            "command": "node .trellis/scripts/run-python-hook.cjs .claude/hooks/inject-spec-context.py",
             "timeout": 30
           }
         ]
@@ -34,12 +34,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/session-start.py",
+            "command": "node .trellis/scripts/run-python-hook.cjs .claude/hooks/session-start.py",
             "timeout": 30
           },
           {
             "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/inject-spec-context.py",
+            "command": "node .trellis/scripts/run-python-hook.cjs .claude/hooks/inject-spec-context.py",
             "timeout": 30
           }
         ]
@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/inject-subagent-context.py",
+            "command": "node .trellis/scripts/run-python-hook.cjs .claude/hooks/inject-subagent-context.py",
             "timeout": 30
           }
         ]
@@ -61,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/inject-subagent-context.py",
+            "command": "node .trellis/scripts/run-python-hook.cjs .claude/hooks/inject-subagent-context.py",
             "timeout": 30
           }
         ]
@@ -73,7 +73,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/inject-spec-context.py",
+            "command": "node .trellis/scripts/run-python-hook.cjs .claude/hooks/inject-spec-context.py",
             "timeout": 15
           }
         ]
@@ -84,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_CMD}} .claude/hooks/inject-workflow-state.py",
+            "command": "node .trellis/scripts/run-python-hook.cjs .claude/hooks/inject-workflow-state.py",
             "timeout": 15
           }
         ]

@@ -5,6 +5,14 @@ import {
   getSettingsTemplate,
 } from "../../src/templates/claude/index.js";
 
+/**
+ * Hook commands go through the Node launcher instead of naming a Python
+ * interpreter, so the committed command is byte-identical on every platform and
+ * a repository written on one OS keeps working after a clone on another.
+ * `{{PYTHON_CMD}}` must therefore no longer appear in these files.
+ */
+const HOOK_LAUNCHER = "node .trellis/scripts/run-python-hook.cjs";
+
 // =============================================================================
 // settingsTemplate — module-level constant
 // =============================================================================
@@ -57,21 +65,24 @@ describe("settingsTemplate SessionStart matchers", () => {
       sessionStartEntries.map((entry) => [entry.matcher, entry.hooks]),
     );
     expect(byMatcher.startup.map((hook) => hook.command)).toEqual([
-      "{{PYTHON_CMD}} .claude/hooks/session-start.py",
+      `${HOOK_LAUNCHER} .claude/hooks/session-start.py`,
     ]);
     for (const source of ["clear", "compact"]) {
       expect(byMatcher[source].map((hook) => hook.command)).toEqual([
-        "{{PYTHON_CMD}} .claude/hooks/session-start.py",
-        "{{PYTHON_CMD}} .claude/hooks/inject-spec-context.py",
+        `${HOOK_LAUNCHER} .claude/hooks/session-start.py`,
+        `${HOOK_LAUNCHER} .claude/hooks/inject-spec-context.py`,
       ]);
       expect(byMatcher[source][1].timeout).toBe(30);
     }
   });
 
-  it("all SessionStart entries use {{PYTHON_CMD}} placeholder", () => {
+  it("all SessionStart entries run through the hook launcher", () => {
     for (const entry of sessionStartEntries) {
       for (const hook of entry.hooks) {
-        expect(hook.command).toContain("{{PYTHON_CMD}}");
+        expect(hook.command).toContain(HOOK_LAUNCHER);
+        // The platform placeholder is gone on purpose; reinstating it would
+        // bake one OS's interpreter name into the committed settings again.
+        expect(hook.command).not.toContain("{{PYTHON_CMD}}");
       }
     }
   });
@@ -105,9 +116,10 @@ describe("settingsTemplate PostToolUse matchers", () => {
     }
   });
 
-  it("all PostToolUse entries use {{PYTHON_CMD}} placeholder", () => {
+  it("all PostToolUse entries run through the hook launcher", () => {
     for (const entry of postToolUseEntries) {
-      expect(entry.hooks[0].command).toContain("{{PYTHON_CMD}}");
+      expect(entry.hooks[0].command).toContain(HOOK_LAUNCHER);
+      expect(entry.hooks[0].command).not.toContain("{{PYTHON_CMD}}");
     }
   });
 });

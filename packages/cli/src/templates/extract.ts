@@ -134,9 +134,15 @@ async function copyDirRecursive(
       const content = fs.readFileSync(srcPath, "utf-8");
       const isExecutable =
         options?.executable && (entry.endsWith(".sh") || entry.endsWith(".py"));
-      await writeFile(destPath, replacePythonCommandLiterals(content), {
-        executable: isExecutable,
-      });
+      // Pass the entry name so launcher templates can opt out of the
+      // python3 rewrite; see isPythonRewriteExempt.
+      await writeFile(
+        destPath,
+        replacePythonCommandLiterals(content, destPath),
+        {
+          executable: isExecutable,
+        },
+      );
     }
   }
 }
