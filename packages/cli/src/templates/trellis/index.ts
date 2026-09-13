@@ -75,6 +75,8 @@ export const initDeveloperScript = readTemplate("scripts/init_developer.py");
 export const taskScript = readTemplate("scripts/task.py");
 export const getContextScript = readTemplate("scripts/get_context.py");
 export const addSessionScript = readTemplate("scripts/add_session.py");
+// Step 0 of the trellis-spec-review skill: mechanical facts only, no judgement.
+export const specLintScript = readTemplate("scripts/spec_lint.py");
 
 // Node launcher that hook commands invoke instead of naming an interpreter.
 // Written verbatim — see `isPythonRewriteExempt`.
@@ -134,6 +136,7 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("task.py", taskScript);
   scripts.set("get_context.py", getContextScript);
   scripts.set("add_session.py", addSessionScript);
+  scripts.set("spec_lint.py", specLintScript);
 
   // Node launcher for hook commands; no extension rewriting (see shared.ts).
   scripts.set("run-python-hook.cjs", runPythonHookScript);

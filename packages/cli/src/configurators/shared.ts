@@ -282,6 +282,12 @@ const SKILL_DESCRIPTIONS: Record<string, string> = {
     "Deep bug analysis to break the fix-forget-repeat cycle. Analyzes root cause category, why fixes failed, prevention mechanisms, and captures knowledge into specs. Use after fixing a bug to prevent the same class of bugs.",
   "update-spec":
     "Captures executable contracts and coding conventions into .trellis/spec/ documents. Use when learning something valuable from debugging, implementing, or discussion that should be preserved for future sessions.",
+  // Command, not a skill file: a same-named entry in both `common/skills/` and
+  // `common/commands/` would collide for platforms that render commands as
+  // skills (resolveAllAsSkillsNeutral concatenates both without dedup). This
+  // description exists only for that rendering path.
+  "spec-review":
+    "Review, tighten and shrink an existing .trellis/spec/ tree: collect mechanical facts with spec_lint.py, judge every entry against the four questions, and propose keep/compress/delete/ask before anything is written. Use when specs have drifted from the code, when path-based injection keeps surfacing noise, or on a routine cleanup cadence.",
 };
 
 /**
@@ -312,6 +318,8 @@ const COMMAND_DESCRIPTIONS: Record<string, string> = {
   continue: "Resume work on the current task at the correct phase.",
   "finish-work":
     "Wrap up the current session: quality gate, commit reminder, archive, journal.",
+  "spec-review":
+    "Review and shrink .trellis/spec/: facts, proposal, then approved edits.",
 };
 
 /** Wrap resolved command content with YAML frontmatter (name + description). */
