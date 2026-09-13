@@ -33,8 +33,7 @@ import {
   frontendStateManagementContent,
   // Guides structure
   guidesIndexContent,
-  guidesCrossLayerThinkingGuideContent,
-  guidesCodeReuseThinkingGuideContent,
+  guidesThinkingTriggersContent,
 } from "../templates/markdown/index.js";
 
 import { writeFile, ensureDir } from "../utils/file-writer.js";
@@ -278,12 +277,8 @@ async function createSpecTemplates(
   const guidesDocs: DocDefinition[] = [
     { name: "index.md", content: guidesIndexContent },
     {
-      name: "cross-layer-thinking-guide.md",
-      content: guidesCrossLayerThinkingGuideContent,
-    },
-    {
-      name: "code-reuse-thinking-guide.md",
-      content: guidesCodeReuseThinkingGuideContent,
+      name: "thinking-triggers.md",
+      content: guidesThinkingTriggersContent,
     },
   ];
   for (const doc of guidesDocs) {
@@ -297,7 +292,9 @@ async function createSpecTemplates(
       if (remoteSpecPackages?.has(dirName)) continue;
       const pkgSpecBase = path.join(cwd, `${PATHS.SPEC}/${dirName}`);
       ensureDir(pkgSpecBase);
-      const pkgType = pkg.type === "unknown" ? "fullstack" : pkg.type;
+      // Unknown package type seeds one set only (backend) — mirrors the
+      // single-repo mapping in commands/init.ts.
+      const pkgType = pkg.type === "unknown" ? "backend" : pkg.type;
       await writeSpecForType(pkgSpecBase, pkgType);
     }
   } else {

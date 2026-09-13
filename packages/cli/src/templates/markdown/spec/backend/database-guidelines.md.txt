@@ -1,51 +1,33 @@
 # Database Guidelines
 
-> Database patterns and conventions for this project.
+> 本项目的数据库约定。
 
 ---
 
 ## Overview
 
-<!--
-Document your project's database conventions here.
-
-Questions to answer:
-- What ORM/query library do you use?
-- How are migrations managed?
-- What are the naming conventions for tables/columns?
-- How do you handle transactions?
--->
-
-(To be filled by the team)
+本文件只写代码库能证明的约定。项目里没有 ORM、没有 migration、没有 SQL 时，删除本文件。
 
 ---
 
 ## Query Patterns
 
-<!-- How should queries be written? Batch operations? -->
-
-(To be filled by the team)
+<!-- 查询怎么写；批量操作怎么做。 -->
 
 ---
 
 ## Migrations
 
-<!-- How to create and run migrations -->
-
-(To be filled by the team)
+<!-- migration 怎么建、怎么跑。 -->
 
 ---
 
 ## Naming Conventions
 
-<!-- Table names, column names, index names -->
-
-(To be filled by the team)
+<!-- 表名、列名、索引名。 -->
 
 ---
 
 ## Common Mistakes
 
-<!-- Database-related mistakes your team has made -->
-
-(To be filled by the team)
+<!-- 真实踩过的坑，一句话一条，附违反后果。 -->

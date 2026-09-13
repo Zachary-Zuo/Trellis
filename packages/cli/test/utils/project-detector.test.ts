@@ -44,7 +44,7 @@ describe("getProjectTypeDescription", () => {
 
   it("returns correct description for unknown", () => {
     expect(getProjectTypeDescription("unknown")).toBe(
-      "Unknown project type (defaults to fullstack)",
+      "Unknown project type (seeds the backend spec set only)",
     );
   });
 

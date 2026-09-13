@@ -1,39 +1,26 @@
 # Frontend Development Guidelines
 
-> Best practices for frontend development in this project.
+> 本项目 frontend 开发的约定。
 
 ---
 
 ## Overview
 
-This directory contains guidelines for frontend development. Fill in each file with your project's specific conventions.
+本目录存放 frontend 开发约定。
+
+index 是地图，不是清单：每行指向一个文件，并说明什么时候该读它。
+
+写文件时只写代码库能证明的约定；某个文件对本项目不适用时直接删除，不要留着占位。
 
 ---
 
 ## Guidelines Index
 
-| Guide | Description | Status |
-|-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition | To fill |
-| [Hook Guidelines](./hook-guidelines.md) | Custom hooks, data fetching patterns | To fill |
-| [State Management](./state-management.md) | Local state, global state, server state | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
-| [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
-
----
-
-## How to Fill These Guidelines
-
-For each guideline file:
-
-1. Document your project's **actual conventions** (not ideals)
-2. Include **code examples** from your codebase
-3. List **forbidden patterns** and why
-4. Add **common mistakes** your team has made
-
-The goal is to help AI assistants and new team members understand how YOUR project works.
-
----
-
-**Language**: All documentation should be written in **English**.
+| 文件 | 内容 | 何时读 |
+|------|------|--------|
+| [directory-structure.md](./directory-structure.md) | 组件 / 页面 / hook 的摆放 | 新增页面或组件、或不确定代码该放哪时 |
+| [component-guidelines.md](./component-guidelines.md) | 组件写法、props 约定、组合方式 | 写组件时 |
+| [hook-guidelines.md](./hook-guidelines.md) | 自定义 hook 的命名与写法 | 抽 hook 或复用有状态逻辑时 |
+| [state-management.md](./state-management.md) | 本地状态、全局状态、服务端状态 | 新增状态、或决定状态放哪一层时 |
+| [type-safety.md](./type-safety.md) | 类型组织、运行时校验 | 定义类型或处理外部数据时 |
+| [quality-guidelines.md](./quality-guidelines.md) | lint、测试、可访问性 | 写代码与 review 时 |

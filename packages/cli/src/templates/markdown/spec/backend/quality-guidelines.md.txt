@@ -1,51 +1,33 @@
 # Quality Guidelines
 
-> Code quality standards for backend development.
+> 后端代码质量标准。
 
 ---
 
 ## Overview
 
-<!--
-Document your project's quality standards here.
-
-Questions to answer:
-- What patterns are forbidden?
-- What linting rules do you enforce?
-- What are your testing requirements?
-- What code review standards apply?
--->
-
-(To be filled by the team)
+本文件只写代码库能证明的约定：lint / 测试配置里已有的规则不必抄一遍，只留代码推不出的要求。
 
 ---
 
 ## Forbidden Patterns
 
-<!-- Patterns that should never be used and why -->
-
-(To be filled by the team)
+<!-- 明确禁止的写法，以及原因。 -->
 
 ---
 
 ## Required Patterns
 
-<!-- Patterns that must always be used -->
-
-(To be filled by the team)
+<!-- 必须使用的写法。 -->
 
 ---
 
 ## Testing Requirements
 
-<!-- What level of testing is expected -->
-
-(To be filled by the team)
+<!-- 什么改动需要什么测试。 -->
 
 ---
 
 ## Code Review Checklist
 
-<!-- What reviewers should check -->
-
-(To be filled by the team)
+<!-- review 时必须确认的点。 -->

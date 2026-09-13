@@ -351,20 +351,20 @@ function getBootstrapChecklistItems(
   packages?: DetectedPackage[],
 ): string[] {
   if (packages && packages.length > 0) {
-    const items = packages.map((pkg) => `Fill guidelines for ${pkg.name}`);
-    items.push("Add code examples");
+    const items = packages.map((pkg) => `为 ${pkg.name} 补充约定`);
+    items.push("删除不适用的种子文件");
     return items;
   }
   if (projectType === "frontend") {
-    return ["Fill frontend guidelines", "Add code examples"];
+    return ["补充 frontend 约定", "删除不适用的种子文件"];
   }
   if (projectType === "backend") {
-    return ["Fill backend guidelines", "Add code examples"];
+    return ["补充 backend 约定", "删除不适用的种子文件"];
   }
   return [
-    "Fill backend guidelines",
-    "Fill frontend guidelines",
-    "Add code examples",
+    "补充 backend 约定",
+    "补充 frontend 约定",
+    "删除不适用的种子文件",
   ];
 }
 
@@ -394,81 +394,96 @@ function getBootstrapPrdContent(
     .map((item) => `- [ ] ${item}`)
     .join("\n");
 
-  const header = `# Bootstrap Task: Fill Project Development Guidelines
+  const header = `# Bootstrap Task：补全项目开发约定
 
-**You (the AI) are running this task. The developer does not read this file.**
+**执行本 task 的是 AI；开发者不会读这个文件。**
 
-The developer just ran \`trellis init\` on this project for the first time.
-\`.trellis/\` now exists with empty spec scaffolding, and this bootstrap task
-exists under \`.trellis/tasks/\`. When they want to work on it, they should start
-this task from a session that provides Trellis session identity.
+开发者刚在这个项目上第一次运行 \`trellis init\`。\`.trellis/\` 已经生成，spec 只有空种子；本 bootstrap task 位于 \`.trellis/tasks/\`。开发者想开工时，会从带 Trellis session 身份的会话里启动它。
 
-**Your job**: help them populate \`.trellis/spec/\` with the team's real
-coding conventions. Every future AI session — this project's
-\`trellis-implement\` and \`trellis-check\` sub-agents — auto-loads spec files
-listed in per-task jsonl manifests. Empty spec = sub-agents write generic
-code. Real spec = sub-agents match the team's actual patterns.
+**你的任务**：帮开发者把团队真实的编码约定写进 \`.trellis/spec/\`。以后每个 AI 会话——主会话、以及派发出去的 \`trellis-implement\` / \`trellis-check\` 子代理——都会读 \`.trellis/spec/\`。spec 空 = 它们写通用代码；spec 真 = 它们照团队的实际写法走。
 
-Don't dump instructions. Open with a short greeting, figure out if the repo
-has any existing convention docs (CLAUDE.md, .cursorrules, etc.), and drive
-the rest conversationally.
+不要一口气把说明倒给开发者。先打个招呼，确认仓库里有没有现成的约定文档（CLAUDE.md、.cursorrules 等），剩下的一步步对话推进。
 
 ---
 
-## Status (update the checkboxes as you complete each item)
+## 五个硬规则
+
+1. **只写代码库能证明的约定。** 有真实文件、真实用法做依据才写；找不到依据就不写，不要写"理想写法"。
+2. **不适用的种子文件直接删除。** spec 里没有这条内容，比留一个占位文件好；删掉比填满更常见。
+3. **每个文件 ≤ 200 行。** 超了就删：先删代码能直接看出来的内容（函数签名、目录树、错误码表）。
+4. **写每一条之前先过四问**（见下），四问全否的条目不要写。
+5. **正文中文，标识符英文。** 文件名、目录名、frontmatter 键、命令、路径、代码标识符保持英文；术语 task / spec / prd / design / implement / hook / index / package / layer / slug / archive / workspace 不翻译。
+
+需要数字、阈值或基准时，由用户给出，不要自己造。
+
+---
+
+## 写入判据（四问）
+
+对每一条候选内容依次问，四问全否 → 不写：
+
+| # | 问题 | 答"是"时 |
+|---|------|----------|
+| Q1 | 读相关代码一分钟内能得到同样信息吗？ | 不写。最多留一行指针"见 \`path/file.py\`" |
+| Q2 | 违反它会造成测试抓不到的错误，或它来自一次真实事故吗？ | 写一行规则 + 违反后果；事故叙事、日期、issue 号删掉 |
+| Q3 | 它是一个代码表达不出的理由吗（决策理由、被否决的方案、与框架默认不同之处）？ | 写，≤ 3 行 |
+| Q4 | 它是操作步骤（how-to）吗？ | 变成脚本或命令，spec 只留一行指向 |
+
+Q1 是最强的一问，先问它。
+
+---
+
+## 进度（完成一项就勾一项）
 
 ${checklistMarkdown}
 
 ---
 
-## Spec files to populate
+## 需要补的 spec 文件
 `;
 
   const backendSection = `
 
 ### Backend guidelines
 
-| File | What to document |
-|------|------------------|
-| \`.trellis/spec/backend/directory-structure.md\` | Where different file types go (routes, services, utils) |
-| \`.trellis/spec/backend/database-guidelines.md\` | ORM, migrations, query patterns, naming conventions |
-| \`.trellis/spec/backend/error-handling.md\` | How errors are caught, logged, and returned |
-| \`.trellis/spec/backend/logging-guidelines.md\` | Log levels, format, what to log |
-| \`.trellis/spec/backend/quality-guidelines.md\` | Code review standards, testing requirements |
+| 文件 | 写什么 |
+|------|--------|
+| \`.trellis/spec/backend/directory-structure.md\` | 各类文件（路由、service、工具）放在哪 |
+| \`.trellis/spec/backend/database-guidelines.md\` | ORM、migration、查询写法、命名 |
+| \`.trellis/spec/backend/error-handling.md\` | 错误怎么捕获、怎么记日志、怎么返回 |
+| \`.trellis/spec/backend/logging-guidelines.md\` | 日志级别、格式、记录什么 |
+| \`.trellis/spec/backend/quality-guidelines.md\` | review 标准、测试要求 |
 `;
 
   const frontendSection = `
 
 ### Frontend guidelines
 
-| File | What to document |
-|------|------------------|
-| \`.trellis/spec/frontend/directory-structure.md\` | Component/page/hook organization |
-| \`.trellis/spec/frontend/component-guidelines.md\` | Component patterns, props conventions |
-| \`.trellis/spec/frontend/hook-guidelines.md\` | Custom hook naming, patterns |
-| \`.trellis/spec/frontend/state-management.md\` | State library, patterns, what goes where |
-| \`.trellis/spec/frontend/type-safety.md\` | TypeScript conventions, type organization |
-| \`.trellis/spec/frontend/quality-guidelines.md\` | Linting, testing, accessibility |
+| 文件 | 写什么 |
+|------|--------|
+| \`.trellis/spec/frontend/directory-structure.md\` | 组件 / 页面 / hook 的组织方式 |
+| \`.trellis/spec/frontend/component-guidelines.md\` | 组件写法、props 约定 |
+| \`.trellis/spec/frontend/hook-guidelines.md\` | 自定义 hook 的命名与写法 |
+| \`.trellis/spec/frontend/state-management.md\` | 状态库、写法、状态放哪 |
+| \`.trellis/spec/frontend/type-safety.md\` | TypeScript 约定、类型组织 |
+| \`.trellis/spec/frontend/quality-guidelines.md\` | lint、测试、可访问性 |
 `;
 
   const footer = `
 
-### Thinking guides (already populated)
+### Thinking triggers（已预置）
 
-\`.trellis/spec/guides/\` contains general thinking guides pre-filled with
-best practices. Customize only if something clearly doesn't fit this project.
+\`.trellis/spec/guides/thinking-triggers.md\` 已放好跨 package 的通用思考触发清单。它与本项目无关时再改；不要去扩写它。
 
 ---
 
-## How to fill the spec
+## 怎么补这些文件
 
-### Step 1: Import from existing convention files first (preferred)
+### Step 1: 先搬现成的约定文档（优先）
 
-Search the repo for existing convention docs. If any exist, read them and
-extract the relevant rules into the matching \`.trellis/spec/\` files —
-usually much faster than documenting from scratch.
+在仓库里找现成的约定文档。有就读取，把相关规则搬进对应的 \`.trellis/spec/\` 文件——通常比从零总结快得多。
 
-| File / Directory | Tool |
+| 文件 / 目录 | 工具 |
 |------|------|
 | \`CLAUDE.md\` / \`CLAUDE.local.md\` | Claude Code |
 | \`AGENTS.md\` | Codex / Claude Code / agent-compatible tools |
@@ -480,63 +495,60 @@ usually much faster than documenting from scratch.
 | \`.github/copilot-instructions.md\` | GitHub Copilot |
 | \`.vscode/settings.json\` → \`github.copilot.chat.codeGeneration.instructions\` | VS Code Copilot |
 | \`CONVENTIONS.md\` / \`.aider.conf.yml\` | aider |
-| \`CONTRIBUTING.md\` | General project conventions |
-| \`.editorconfig\` | Editor formatting rules |
+| \`CONTRIBUTING.md\` | 通用项目约定 |
+| \`.editorconfig\` | 编辑器格式规则 |
 
-### Step 2: Analyze the codebase for anything not covered by existing docs
+### Step 2: 扫代码，补文档没覆盖的部分
 
-Scan real code to discover patterns. Before writing each spec file:
-- Find 2-3 real examples of each pattern in the codebase.
-- Reference real file paths (not hypothetical ones).
-- Document anti-patterns the team clearly avoids.
+读真实代码找 pattern。写每个 spec 文件之前：
 
-### Step 3: Document reality, not ideals
+- 在代码库里找 2-3 个真实例子，不要凭印象写。
+- 引用真实文件路径，不写假想路径。
+- 团队明显在回避的写法才记成反例。
 
-**Critical**: write what the code *actually does*, not what it should do.
-Sub-agents match the spec, so aspirational patterns that don't exist in the
-codebase will cause sub-agents to write code that looks out of place.
+### Step 3: 写现状，不写理想
 
-If the team has known tech debt, document the current state — improvement
-is a separate conversation, not a bootstrap concern.
+**关键**：写代码**实际怎么做**，不是应该怎么做。子代理会照 spec 办事；写了代码库里不存在的"目标写法"，只会让它们写出格格不入的代码。
 
----
+已知的技术债就照现状记；改不改是另一件事，不是 bootstrap 要解决的。
 
-## Quick explainer of the runtime (share when they ask "why do we need spec at all")
+### Step 4: 逐个文件收口
 
-- Every AI coding task spawns two sub-agents: \`trellis-implement\` (writes
-  code) and \`trellis-check\` (verifies quality).
-- Each task has \`implement.jsonl\` / \`check.jsonl\` manifests listing which
-  spec files to load.
-- The platform hook auto-injects those spec files + the task's \`prd.md\`
-  into every sub-agent prompt, so the sub-agent codes/reviews per team
-  conventions without anyone pasting them manually.
-- Source of truth: \`.trellis/spec/\`. That's why filling it well now pays
-  off forever.
+每写完一个文件，问两件事：
+
+- 这个文件里的内容，代码库都能证明吗？证明不了的删掉。
+- 这个文件对本项目适用吗？不适用就删掉整个文件。
+
+若清理后这个文件对本项目没有价值，删掉它——package 的 \`index.md\` 里也去掉对应那一行。
 
 ---
 
-## Completion
+## bootstrap 任务结束后
 
-When the developer confirms the checklist items above are done with real
-examples (not placeholders), guide them to run:
+完成状态：上面每一项都基于真实代码，没有占位内容。
+
+然后引导开发者运行：
 
 \`\`\`bash
 ${pythonCmd} ./.trellis/scripts/task.py finish
 ${pythonCmd} ./.trellis/scripts/task.py archive 00-bootstrap-guidelines
 \`\`\`
 
-After archive, every new developer who joins this project will get a
-\`00-join-<slug>\` onboarding task instead of this bootstrap task.
+归档后，之后新加入的开发者会拿到 \`00-join-<slug>\` 引导 task，而不是这个 bootstrap task。
 
 ---
 
-## Suggested opening line
+## 关于任务派发（开发者问"要不要跑子代理"时再讲）
 
-"Welcome to Trellis! Your init just set me up to help you fill the project
-spec — a one-time setup so every future AI session follows the team's
-conventions instead of writing generic code. Before we start, do you have
-any existing convention docs (CLAUDE.md, .cursorrules, CONTRIBUTING.md,
-etc.) I can pull from, or should I scan the codebase from scratch?"
+- 主会话直接改代码是默认形态；本 task 不需要派子代理。
+- \`implement.jsonl\` / \`check.jsonl\` 是**可选**的上下文清单：只有要把活派给子代理时才需要，用来声明子代理该读哪些 spec 文件。它们是可选项，不是格式要求。
+- 不派子代理就不需要写这种清单，主会话按 \`.trellis/spec/\` 写作即可。
+
+---
+
+## 开场白建议
+
+"欢迎使用 Trellis！init 已经把项目 spec 的骨架搭好了——这是一次性的设置，做完以后每个 AI 会话都会按团队的约定走，而不是写通用代码。开始之前想确认一下：有没有现成的约定文档（CLAUDE.md、.cursorrules、CONTRIBUTING.md 等）可以让我直接搬？没有的话我就从代码里扫。"
 `;
 
   let content = header;
@@ -544,7 +556,9 @@ etc.) I can pull from, or should I scan the codebase from scratch?"
   if (packages && packages.length > 0) {
     // Monorepo: generate per-package sections
     for (const pkg of packages) {
-      const pkgType = pkg.type === "unknown" ? "fullstack" : pkg.type;
+      // Unknown package type seeds one set only (backend) — no detectable
+      // framework must not produce both backend and frontend seeds.
+      const pkgType = pkg.type === "unknown" ? "backend" : pkg.type;
       const specName = sanitizePkgName(pkg.name);
       content += `\n### Package: ${pkg.name} (\`spec/${specName}/\`)\n`;
       if (pkgType !== "frontend") {
@@ -1462,9 +1476,10 @@ export async function init(options: InitOptions): Promise<void> {
     tools = answers.tools;
   }
 
-  // Treat unknown project type as fullstack
+  // Treat unknown project type as backend: a repo with no detectable
+  // framework seeds one set, not both backend and frontend.
   const projectType: ProjectType =
-    detectedType === "unknown" ? "fullstack" : detectedType;
+    detectedType === "unknown" ? "backend" : detectedType;
 
   if (tools.length === 0) {
     console.log(

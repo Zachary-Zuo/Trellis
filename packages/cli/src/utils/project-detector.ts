@@ -206,7 +206,7 @@ export function getProjectTypeDescription(type: ProjectType): string {
     case "fullstack":
       return "Fullstack project (frontend + backend)";
     case "unknown":
-      return "Unknown project type (defaults to fullstack)";
+      return "Unknown project type (seeds the backend spec set only)";
   }
 }
 

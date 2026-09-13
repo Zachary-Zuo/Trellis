@@ -89,9 +89,6 @@ export const frontendStateManagementContent: string = readLocalTemplate(
 export const guidesIndexContent: string = readLocalTemplate(
   "spec/guides/index.md.txt",
 );
-export const guidesCrossLayerThinkingGuideContent: string = readLocalTemplate(
-  "spec/guides/cross-layer-thinking-guide.md.txt",
-);
-export const guidesCodeReuseThinkingGuideContent: string = readLocalTemplate(
-  "spec/guides/code-reuse-thinking-guide.md.txt",
+export const guidesThinkingTriggersContent: string = readLocalTemplate(
+  "spec/guides/thinking-triggers.md.txt",
 );

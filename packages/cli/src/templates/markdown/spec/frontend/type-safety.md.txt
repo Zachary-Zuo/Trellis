@@ -1,51 +1,33 @@
 # Type Safety
 
-> Type safety patterns in this project.
+> 本项目的类型安全写法。
 
 ---
 
 ## Overview
 
-<!--
-Document your project's type safety conventions here.
-
-Questions to answer:
-- What type system do you use?
-- How are types organized?
-- What validation library do you use?
-- How do you handle type inference?
--->
-
-(To be filled by the team)
+本文件只写代码库能证明的约定。类型配置本身能表达的规则不必抄一遍。
 
 ---
 
 ## Type Organization
 
-<!-- Where types are defined, shared types vs local types -->
-
-(To be filled by the team)
+<!-- 类型定义在哪；共享类型与局部类型怎么分。 -->
 
 ---
 
 ## Validation
 
-<!-- Runtime validation patterns (Zod, Yup, io-ts, etc.) -->
-
-(To be filled by the team)
+<!-- 运行时校验怎么写（Zod、Yup、io-ts 等）。 -->
 
 ---
 
 ## Common Patterns
 
-<!-- Type utilities, generics, type guards -->
-
-(To be filled by the team)
+<!-- 类型工具、泛型、type guard。 -->
 
 ---
 
 ## Forbidden Patterns
 
-<!-- any, type assertions, etc. -->
-
-(To be filled by the team)
+<!-- any、类型断言等禁止写法，以及原因。 -->

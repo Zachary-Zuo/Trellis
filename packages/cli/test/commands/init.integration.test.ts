@@ -1093,14 +1093,14 @@ describe("init() integration", () => {
     expect(Object.keys(hashes).length).toBeGreaterThan(0);
   });
 
-  it("#10 creates spec templates for backend, frontend, and guides", async () => {
+  it("#10 creates spec templates for backend and guides; unknown type seeds backend only", async () => {
     await init({ yes: true });
 
+    // No framework marker in the temp dir → detectProjectType() === "unknown".
+    // unknown seeds ONE set (backend); frontend must not be created.
     const specDir = path.join(tmpDir, PATHS.SPEC);
     expect(fs.existsSync(path.join(specDir, "backend", "index.md"))).toBe(true);
-    expect(fs.existsSync(path.join(specDir, "frontend", "index.md"))).toBe(
-      true,
-    );
+    expect(fs.existsSync(path.join(specDir, "frontend"))).toBe(false);
     expect(fs.existsSync(path.join(specDir, "guides", "index.md"))).toBe(true);
   });
 
@@ -1251,14 +1251,16 @@ describe("init() integration", () => {
     expect(taskJson.relatedFiles).toContain(".trellis/spec/ui/");
 
     // prd.md mentions packages + renders per-package checklist items
+    // (bootstrap PRD body is Chinese — see drafts/workflow-lite-plan.md §0.4)
     const prd = fs.readFileSync(path.join(taskDir, "prd.md"), "utf-8");
     const expectedPythonCmd =
       process.platform === "win32" ? "python" : "python3";
     expect(prd).toContain("core");
     expect(prd).toContain("ui");
     expect(prd).toContain("spec/");
-    expect(prd).toContain("- [ ] Fill guidelines for core");
-    expect(prd).toContain("- [ ] Fill guidelines for ui");
+    expect(prd).toContain("- [ ] 为 core 补充约定");
+    expect(prd).toContain("- [ ] 为 ui 补充约定");
+    expect(prd).toContain("- [ ] 删除不适用的种子文件");
     expect(prd).toContain(
       `${expectedPythonCmd} ./.trellis/scripts/task.py finish`,
     );
@@ -1273,11 +1275,11 @@ describe("init() integration", () => {
     await init({ yes: true, monorepo: false });
 
     const specDir = path.join(tmpDir, PATHS.SPEC);
-    // Single-repo spec (global backend + frontend), no per-package dirs
+    // Single-repo spec, no per-package dirs. The repo has no framework
+    // marker → detectProjectType() === "unknown", which now seeds backend
+    // only (not both sets).
     expect(fs.existsSync(path.join(specDir, "backend", "index.md"))).toBe(true);
-    expect(fs.existsSync(path.join(specDir, "frontend", "index.md"))).toBe(
-      true,
-    );
+    expect(fs.existsSync(path.join(specDir, "frontend"))).toBe(false);
     expect(fs.existsSync(path.join(specDir, "a"))).toBe(false);
 
     // config.yaml should NOT have packages: section
