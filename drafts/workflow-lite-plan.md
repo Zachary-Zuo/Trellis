@@ -787,3 +787,61 @@ PRD 骨架（aee145b3 已提交的中文版，本稿只改标 ★ 的两处）�
 - 契约文档 `.trellis/spec/cli/backend/workflow-state-contract.md`：L16 与 L440 声称"每个 `[required · once]` 步骤必须在所属 phase 的 breadcrumb 里有对应行"，并说该 invariant 在 `test/regression.test.ts` 里——**全仓搜索确认这条测试不存在**（`[required · once]` 只出现在 workflow.md 自身与 `update.integration.test.ts:852,1549` 的字面 fixture）。workflow.md 的旧契约注释也引用了它，本片已删；契约文档待订正。
 - **21 个既有失败与本片无关**，已用 `git stash` 建立基线确认：`.trellis/scripts` 与模板逐字节比对 2 条、`add_session.py` branch context 5 条、`env-file-dedup` 4 条、`session-start.py py_compile` 3 条、其他 7 条。本片改动的净新增失败为 **0**。
 - §7 的问题 11（`spec_lint.py` 进第一版）与问题 12（刷新本仓库 `.trellis/workflow.md`）仍未决，但已确认**本片不需要**：模板改动不进入本仓库自己的 `.trellis/`，所以自举风险在本片不存在。
+
+---
+
+## 9. 第 2、3 片执行记录
+
+### 9.1 第 2 片：模板文本
+
+| 面 | 改动 | 实测 |
+|---|---|---|
+| `templates/trellis/config.yaml` | `channel:` 整块注释；`spec_injection:` 打开并把 `max_spec_chars` 9400 → 3000、`max_total_chars` 9500 → 4000，附注说明"收成 `[Edit, Write]` 是后续步骤" | 只对新建项目生效（config.yaml 由 init 写入，update 不管） |
+| `shared-hooks/session-start.py` | `<first-reply-notice>` 改为**有 update hint 才发**：无 hint 返回空串；有 hint 只发一行 | 每会话省 779 B（无 hint 时归零） |
+| `codex/hooks/session-start.py` | 该 hook 没有 hint 机制，通知整段删除（常量 + 写入点） | 同样的 779 B |
+| `opencode/lib/session-utils.js`、`opencode/plugins/session-start.js`、`pi/extensions/trellis/index.ts.txt` | 同上删除；opencode 里那条用于剥离该块的死正则与 helper 一并移除 | — |
+| `common/skills/brainstorm.md`（195 → 205 行） | §3.3.1 全部：五类提问按序、偏差信号表、先告知再问、一次一个决策点；删 `Non-Negotiable` 与"至少一轮往返"；删 `## PRD Convergence Pass`；删 jsonl 门禁与轻量/复杂二分；补语言规则与 design/implement 短模板 | 技能保持英文 |
+| `common/skills/check.md`（106 → 76） | §3.3.2 重写：对照验收标准给证据；删"逐包读 index 的 Quality Check"、`Test Coverage` 三项、`Spec Sync` 复选框、`Cross-Layer Dimensions` 四节（改为指向 `guides/thinking-triggers.md`）；保留 scope discipline 五项 | — |
+| `common/skills/update-spec.md`（351 → 81） | §3.3.3 delta 语义：三种写入条件、四问门禁、add/modify/remove 且必须点名被替代的旧条目、200 行/12 KB 预算、4 个短模板、5 项 checklist（2 项是减法）；删 `Code-Spec First Rule`、`Mandatory Triggers`、7 段模板、旧 checklist、`Core Philosophy` | ≤120 行目标达成 |
+| `common/skills/before-dev.md`（46 → 41） | 第 4 步不再引用不存在的 `Pre-Development Checklist`；第 6 步并入第 5 步并按需触发；删末行 `mandatory` | — |
+| `common/commands/{continue,start,finish-work}.md` | 删轻量/复杂二分与每轮征求同意；`start` 的"无任务"分支改为档 A 默认；`finish-work` 写明"调用即同意归档" | — |
+| 21 平台的 `trellis-check` / `trellis-implement` 定义（33 个文件） | 规则一：机械问题就地修、判断问题上报 + reviewer 约束；规则二：改为"跑与改动相关的检查" | 方案原以为"三平台各一份"，实际 21 平台 × 3 角色 |
+| `shared-hooks/inject-subagent-context.py`、`opencode/plugins/inject-subagent-context.js` | check prompt 的 "Fix issues yourself" / "lint and typecheck" / "complete checklist" 三处措辞 | 方案 §3.3.11 只点了 implement 模板，check 侧漏了 |
+| `trellis-spec-bootstrap`、`trellis-meta`、`trellis-session-insight` | bootstrap 加"文件越少越好 / 算法仓库只要 conventions + verification / 写入前四问"；meta 的 index 断言与 1.3 名称、路由表命名订正；session-insight 修 3 处漂移（假的 `--mem task` 旗标、OpenCode "stub"、缺 dsh） | — |
+| `templates/markdown/`（22 文件 2264 行 → 20 文件 756 行） | 正文改中文；删三处 "must be written in English"；index 加"何时读"列、删 How-to-Fill；guides 合并为 33 行 `thinking-triggers.md`；删 633 行 cross-platform 指南 | −1508 行 |
+| `commands/init.ts` + `configurators/workflow.ts` | bootstrap 描述改中文；`unknown` 不再映射为 `fullstack`，单仓与 monorepo 两条路径都改为只种 backend | `configurators/workflow.ts` 是导出改名与第二条 unknown 映射的必然连带 |
+
+另：删除了三份已删除 guides 的遗留引用（`break-loop.md` 与其 copilot 镜像、`check-cross-layer.prompt.md`、`trellis-meta/add-project-local-conventions.md`），并把 `trellis-meta/local-architecture/workflow.md` 里"默认派发子代理"改成"主会话默认"。
+
+### 9.2 第 3 片：spec-review
+
+- 新增 `templates/trellis/scripts/spec_lint.py`（359 行，只算事实：清单/超预算/陈旧/死引用/重复段落/叙事信号/索引一致性；支持 `--json`、`--root`、`--stale-months`、`--max-lines`、`--max-bytes`），已注册进 `templates/trellis/index.ts` 的 `getAllScripts()`，并同步到 `.trellis/scripts/`（有一条逐字节一致性测试）
+- 新增 `common/commands/spec-review.md`（§4 全流程：四问判据、八个诊断标签归四个动作、Step 0–5、pinned / 40% 删除上限 / ASK / REVIEW-LOG 保护）
+- `configurators/shared.ts` 补 `COMMAND_DESCRIPTIONS` 与 `SKILL_DESCRIPTIONS` 条目
+
+**实测（`spec_lint.py --root .`）**：42 文件 / **19,594 行** / 1.03 MB，其中 **30 个文件超预算**；`platform-integration.md` 2,370 行 / 197,630 B，`script-conventions.md` 2,860 行 / 132,069 B。
+
+> 数字更正：§5.1 与我先前报的"14,738 行"来自 PowerShell 计数，不准。真实是 19,594 行——方案原文 §1 的"净增 19,663 行"才是对的。
+
+### 9.3 新增的推翻登记（并入 §6.1）
+
+| 被推翻的决定 | 证据 | 为何推翻 |
+|---|---|---|
+| 规划收尾必须做一次"无损 PRD 重写" | `regression.test.ts` `[#320]`（已改为 `[#320-reversed]`） | 机械步骤，产出与输入几乎相同；收敛门与最终批准门保留 |
+| SessionStart 必须发 `<first-reply-notice>` 并致谢 | `regression.test.ts`（helper + 5077/5097 + 6187-6218）、`opencode.test.ts`、`pi.test.ts` | 纯仪式；该块只是 update hint 的投递通道，无 hint 就不该发 |
+| `continue.md` / `start.md` 必须做轻量/复杂二分 | 两个命令文件与 copilot 镜像 | 单一任务形态 |
+| `unknown` 项目类型映射为 `fullstack` | `init.integration.test.ts` #10 / #16 | 会同时种 backend + frontend 两套，且多数仓库并非全栈 |
+
+### 9.4 偏差与撤回
+
+1. **`spec-review` 只做命令，不做技能**（原方案 §4.1 要技能 + 命令各一份）。原因：`resolveAllAsSkillsNeutral` 把命令也渲染成技能且不去重，同名会在 codex 上重复出一条；仓库既有约定是"一个名字只占一个通道"（`start`/`continue`/`finish-work` 是命令，`check`/`update-spec` 等是技能）。方法整体并入命令文件。注意：命令仍需 `SKILL_DESCRIPTIONS` 条目，否则 codex 的渲染路径会抛错。
+2. **载荷双发不动**：`session-start.py` 早有 ZCode 排除（注释写明 ZCode 两个键都读会重复），顶层键是给 Cursor 的。§3.2 这条属过时项。
+3. **jsonl 去种子化不做**：`task.py start` 的门禁注释写明"absent manifest is not gated"，去种子化属方案 §5.0 的"可选小段代码（第一版可全跳过）"。
+4. **步骤不重编号**：`workflow.md` 自己写着 "Numbering kept stable to avoid breaking external references"，仓库有先例。
+5. **`generic` 项目类型仍延后**，但第一版兜底已落地（unknown → 只种 backend）。
+
+### 9.5 遗留
+
+- `transcriptHasAssistantMessage`（`opencode/lib/context-visibility.js:121`）在本次改动后全仓无引用，但它是导出函数，删除属独立清理，未动。
+- 4 条 `[worktree-identity]` 测试在全套并行跑时偶发失败，单独跑 9/9 通过——并行 git 操作的测试环境问题，与本改动无关。
+- 契约文档与 `trellis-meta` 里仍有个别"默认派发子代理"的历史表述，已在 9.1 修掉主要的两处。
