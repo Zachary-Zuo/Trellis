@@ -840,8 +840,39 @@ PRD 骨架（aee145b3 已提交的中文版，本稿只改标 ★ 的两处）�
 4. **步骤不重编号**：`workflow.md` 自己写着 "Numbering kept stable to avoid breaking external references"，仓库有先例。
 5. **`generic` 项目类型仍延后**，但第一版兜底已落地（unknown → 只种 backend）。
 
-### 9.5 遗留
+### 9.5 第 3 片试点结果（`commands-update.md`，411 行 / 35 KB）
+
+按 §4.4 逐步跑通了 Step 0–3，产出提案 `.trellis/spec/.review/2026-09-13-commands-update.md`，**未改动任何 spec 文件**（Step 4 需要用户批准）。分类：KEEP 8 / TIGHTEN 14 / MERGE 2 / DERIVABLE 2 / STALE 4 / NARRATIVE 1 / ASK 1；预计 411 行 → ~202 行。
+
+抓到 5 处真实失效，其中两处是首版 `spec_lint.py` **完全漏掉**的：
+
+| 失效 | 位置 | 说明 |
+|---|---|---|
+| S1 | `commands-update.md:235` | 引用的 `missingAgentsMdHash` / `collectMissingAgentsMdHash` 在 `packages/cli/src|test` 里**零出现**；真实来源是 `unchangedFileHashRepairs`（`update.ts:2715`） |
+| S2 | `commands-update.md:91` | 锚点 `commands/update.ts:replaceTrellisManagedBlock` 不存在；真名 `replaceManagedBlock`（`update.ts:156`） |
+| S3 | `:389-398` | `@internal` 导出清单与真实不符（`cleanupEmptyDirs` 是从 `utils/managed-paths.ts` 再导出；实际只有 5 个 `@internal`）；测试归属也写反了 |
+| S4 | `:373` | `#22` 在 `update.integration.test.ts` 里用了两次；该文件共 44 个 `it()` |
+| S5 | `:25` | 幂等不变量称"up-to-date 时什么都不写"，但 `update.ts:2442-2447` 会修哈希回执 |
+| 另有 ~25 处 | — | 经核验为真，均带 `file:line` 锚点 |
+
+**因此对 `spec_lint.py` 做了实质性修正**（首版在死引用上 8/8 全是误报，且漏掉上面两处真失效）：
+
+| 修正 | 效果 |
+|---|---|
+| 支持 `path/file.ts:symbol` 锚点 | 本仓库 spec 的主流锚点形式，首版**完全匹配不到**（该文件有 45 处），这正是 S2 漏检的原因 |
+| 标识符正则不再要求紧跟 `(` | 首版要求 `name(` 才会检查，所以裸提到的符号一律跳过——S1 漏检的原因 |
+| 路径解析改为多基：仓库根 / `packages/` / 各包根 / 各包 `src`、`test` / spec 根；另加"首段是包名 → `packages/<pkg>/src`"的映射 | 死路径误报 238 → 54；S2、S1 稳定命中 |
+| 排除描**用户项目生成布局**的路径（`.opencode/…`、`.github/copilot/…`）与 `.review/`、`REVIEW-LOG.md` | 消除一整类结构性误报 |
+| issue 正则要求 3 位以上数字 | `#1..#27` 这类用例编号不再被当成 issue 叙事 |
+| inventory 增补 `heading_count` / `headings` 与每文件叙事计数 | Step 1 需要按 H2/H3 切分，首版不提供标题清单，只能手工数 |
+
+**方法层（命令文件）也按试点发现补了 6 处**：删除上限明确"按整棵树、单文件无上限"；STALE 的动作拆成"改写"与"删除"两种并要求分列，避免改写被当成删除批准；Step 2 增加"字面为假但在其声明前提下为真"归为 CONTRADICTED（窄化后可 STALE）；Step 3 需自建 `.review/` 目录、Steps 4 需自建 `REVIEW-LOG.md`；行预算与字节预算不一致时要同时报告，不能只报通过的那个；`paths:` 要检查已声明路径是否覆盖正文实际引用的文件。
+
+试点同时确认了两件设计上的事：四问判据在真实文件上可执行、无需猜测；**`stale`（按 mtime 超 3 个月）在全新 checkout 或批量 touch 后结构性恒为 0**，此时它不携带任何信号——保留但不可依赖。
+
+### 9.6 遗留
 
 - `transcriptHasAssistantMessage`（`opencode/lib/context-visibility.js:121`）在本次改动后全仓无引用，但它是导出函数，删除属独立清理，未动。
 - 4 条 `[worktree-identity]` 测试在全套并行跑时偶发失败，单独跑 9/9 通过——并行 git 操作的测试环境问题，与本改动无关。
-- 契约文档与 `trellis-meta` 里仍有个别"默认派发子代理"的历史表述，已在 9.1 修掉主要的两处。
+- `spec_lint.py` 剩余的 ~54 条死路径里仍有散文举例（如 `templates/common/skills/foo.md`）与用户项目布局片段；已从 238 降到 54，进一步收敛需要按仓库定制白名单，暂不做。
+- Step 4–5 未执行：提案已就绪，等用户批准后才改 spec。

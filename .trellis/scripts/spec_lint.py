@@ -47,29 +47,111 @@ CODE_EXTENSIONS = {
     ".yml", ".md", ".sh", ".ps1", ".txt",
 }
 
-# A repo-relative looking path inside prose: at least one slash plus a known
-# extension, optionally wrapped in backticks.
-PATH_REF_RE = re.compile(
-    r"`([A-Za-z0-9_./-]+/[A-Za-z0-9_.-]+\.(?:"
-    + "|".join(sorted(e.lstrip(".") for e in CODE_EXTENSIONS))
-    + r"))`"
+_EXT_ALT = "|".join(sorted(e.lstrip(".") for e in CODE_EXTENSIONS))
+
+# A file path inside prose, with an optional `:symbol` anchor. This repo's
+# dominant spec anchor style is `packages/cli/src/x.ts:symbolName`, so the
+# symbol must be captured separately: matching only the path silently skips
+# every stale symbol reference in the tree. A directory separator is required,
+# otherwise bare filenames like `prd.md` are reported as dead paths.
+ANCHOR_REF_RE = re.compile(
+    r"`((?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+\.(?:" + _EXT_ALT + r"))"
+    r"(?::([A-Za-z_][A-Za-z0-9_]*))?`"
 )
 
 # A CLI flag: `--something` or a bare --something.
 FLAG_REF_RE = re.compile(r"`?(--[a-z][a-z0-9-]{1,40})`?")
 
-# A backticked identifier immediately followed by "(".
-IDENT_CALL_RE = re.compile(r"`([A-Za-z_][A-Za-z0-9_]{2,60})\s*\(`?")
+# Any backticked identifier. The earlier pattern required `(` immediately
+# after the name, which skipped every symbol mentioned without a call site.
+IDENT_REF_RE = re.compile(r"`([A-Za-z_][A-Za-z0-9_]{3,60})`")
 
 # Markdown link target inside an index file.
 MD_LINK_RE = re.compile(r"\[[^\]]*\]\(([^)#]+?)(?:#[^)]*)?\)")
 
+# Narrative signals. The issue pattern requires 3+ digits on purpose: this
+# repo's specs cite cases as `#1`..`#27`, and a 2-digit pattern turned every
+# such list into a false narrative hit.
 NARRATIVE_PATTERNS = (
     ("date", re.compile(r"\b(?:19|20)\d{2}-\d{2}-\d{2}\b")),
-    ("issue", re.compile(r"(?:^|[\s(])#\d{2,6}\b")),
+    ("issue", re.compile(r"(?:^|[\s(])#\d{3,6}\b")),
     ("version", re.compile(r"\bv?\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?\b")),
     ("story", re.compile(r"cautionary tale|post-?mortem|incident|scenario", re.I)),
 )
+
+_HEADING_RE = re.compile(r"^(#{2,4})\s+(.*)$", re.MULTILINE)
+
+
+def looks_like_identifier(token: str) -> bool:
+    """True for code-shaped names, false for ordinary English words.
+
+    Without this filter the identifier scan reports every prose word it cannot
+    find in the code, which buries the real findings.
+    """
+    return "_" in token or any(c.isupper() for c in token[1:])
+
+
+def search_bases(root: Path) -> list[Path]:
+    """Directories a spec path reference may be relative to.
+
+    Specs in this repo are written relative to a package root (`packages/cli/`)
+    or the repo root, not always the repository root, so `(root / ref).exists()`
+    alone reported roughly half of all live references as dead.
+    """
+    bases = [root]
+    packages = root / "packages"
+    if packages.is_dir():
+        bases.append(packages)
+        for pkg in sorted(packages.iterdir()):
+            if pkg.is_dir():
+                bases.extend((pkg, pkg / "src", pkg / "test"))
+    bases.extend((root / ".trellis", root / ".trellis" / "scripts"))
+    return bases
+
+
+def package_sources(root: Path) -> dict[str, Path]:
+    """Map a package name to its source root.
+
+    The specs write `core/mem/sessions.ts` for `packages/core/src/mem/...`:
+    the leading segment names the package, and the package's source root is
+    `packages/<name>/src/`. That rewrite cannot be expressed as a fixed base.
+    """
+    out: dict[str, Path] = {}
+    packages = root / "packages"
+    if packages.is_dir():
+        for pkg in sorted(packages.iterdir()):
+            src = pkg / "src"
+            if src.is_dir():
+                out[pkg.name] = src
+    return out
+
+
+def resolve_ref(bases: list[Path], pkg_src: dict[str, Path], ref: str) -> bool:
+    for base in bases:
+        try:
+            if (base / ref).exists():
+                return True
+        except OSError:
+            continue
+    head, _, tail = ref.partition("/")
+    src = pkg_src.get(head)
+    if src is not None and tail:
+        try:
+            if (src / tail).exists():
+                return True
+        except OSError:
+            pass
+    return False
+
+
+def is_generated_layout_ref(ref: str) -> bool:
+    """True for a path that describes a USER project, not this repository.
+
+    Specs legitimately name platform artifacts the CLI writes into someone
+    else's project — `.opencode/package.json`, `.github/copilot/hooks.json`.
+    Those never exist here, and reporting them as dead buries the real ones.
+    """
+    return ref.startswith(".") and not ref.startswith("./")
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +223,13 @@ def build_code_index(root: Path) -> str:
 
 
 def scan(spec_root: Path, root: Path, args: argparse.Namespace) -> dict:
-    files = sorted(p for p in spec_root.rglob("*.md") if p.is_file())
+    # Review artifacts live under the spec tree but are not specs: linting the
+    # proposal against itself produces noise the reviewer has to filter out.
+    excluded = {".review", "REVIEW-LOG.md"}
+    files = sorted(
+        p for p in spec_root.rglob("*.md")
+        if p.is_file() and not (set(p.parts) & excluded) and p.name not in excluded
+    )
     cutoff = month_cutoff(args.stale_months)
     code_blob = build_code_index(root)
 
@@ -152,6 +240,12 @@ def scan(spec_root: Path, root: Path, args: argparse.Namespace) -> dict:
     dead_paths: list[dict] = []
     dead_flags: list[dict] = []
     dead_idents: list[dict] = []
+    dead_anchors: list[dict] = []
+    bases = search_bases(root)
+    # Specs also reference their own siblings as `guides/x.md`, relative to the
+    # spec root rather than the repository root.
+    bases.append(spec_root)
+    pkg_src = package_sources(root)
 
     for path in files:
         text = read_text(path)
@@ -165,6 +259,11 @@ def scan(spec_root: Path, root: Path, args: argparse.Namespace) -> dict:
             mtime, size = datetime.now(timezone.utc), len(text.encode())
 
         lines = text.count("\n") + (1 if text and not text.endswith("\n") else 0)
+        headings = [
+            {"level": len(m.group(1)), "line": text[: m.start()].count("\n") + 1,
+             "title": m.group(2).strip()}
+            for m in _HEADING_RE.finditer(text)
+        ]
         inventory.append({
             "path": rel,
             "lines": lines,
@@ -174,6 +273,10 @@ def scan(spec_root: Path, root: Path, args: argparse.Namespace) -> dict:
             "over_lines": lines > args.max_lines,
             "over_bytes": size > args.max_bytes,
             "stale": mtime < cutoff,
+            # Step 1 splits the file at H2/H3; having the list here saves the
+            # reader from counting headings by hand.
+            "heading_count": len(headings),
+            "headings": headings,
         })
 
         # Duplicate paragraphs (normalized, long enough to be prose not a label).
@@ -182,26 +285,37 @@ def scan(spec_root: Path, root: Path, args: argparse.Namespace) -> dict:
             if len(norm) >= MIN_DUPLICATE_CHARS:
                 paragraphs.setdefault(norm, []).append(rel)
 
-        # Narrative signals.
+        # Narrative signals (counted per file as well as listed).
+        file_signals = 0
         for para in split_paragraphs(text):
             hits = [name for name, rx in NARRATIVE_PATTERNS if rx.search(para)]
             if hits:
+                file_signals += 1
                 narrative.append({
                     "path": rel,
                     "signals": hits,
                     "excerpt": re.sub(r"\s+", " ", para)[:110],
                 })
+        inventory[-1]["narrative_signals"] = file_signals
 
-        # Dead references.
-        for ref in set(PATH_REF_RE.findall(text)):
+        # Dead references. A path is only dead when it resolves against no
+        # candidate base; a `path:symbol` anchor is additionally checked
+        # against the code index.
+        for ref, symbol in set(ANCHOR_REF_RE.findall(text)):
             if ref.startswith(("http://", "https://")):
                 continue
-            if not (root / ref).exists():
+            if is_generated_layout_ref(ref):
+                continue
+            if not resolve_ref(bases, pkg_src, ref):
                 dead_paths.append({"path": rel, "ref": ref})
+            elif symbol and symbol not in code_blob:
+                dead_anchors.append({"path": rel, "ref": f"{ref}:{symbol}"})
         for flag in set(FLAG_REF_RE.findall(text)):
             if flag not in code_blob:
                 dead_flags.append({"path": rel, "ref": flag})
-        for ident in set(IDENT_CALL_RE.findall(text)):
+        for ident in set(IDENT_REF_RE.findall(text)):
+            if not looks_like_identifier(ident):
+                continue
             if ident not in code_blob:
                 dead_idents.append({"path": rel, "ref": ident})
 
@@ -271,6 +385,7 @@ def scan(spec_root: Path, root: Path, args: argparse.Namespace) -> dict:
         "duplicate_paragraphs": duplicates,
         "dead_references": {
             "paths": dead_paths,
+            "anchors": dead_anchors,
             "flags": dead_flags,
             "identifiers": dead_idents,
         },
@@ -312,7 +427,10 @@ def report(report_data: dict) -> None:
             lambda e: e["path"])
     section("duplicate paragraphs", report_data["duplicate_paragraphs"],
             lambda d: f"x{d['count']:<3} {', '.join(d['locations'])} :: {d['paragraph'][:70]}")
-    section("dead references", report_data["dead_references"]["paths"],
+    section("dead file paths", report_data["dead_references"]["paths"],
+            lambda d: f"{d['ref']}  (in {d['path']})")
+    section("dead `path:symbol` anchors",
+            report_data["dead_references"]["anchors"],
             lambda d: f"{d['ref']}  (in {d['path']})")
     section("dead CLI flags", report_data["dead_references"]["flags"],
             lambda d: f"{d['ref']}  (in {d['path']})")
@@ -326,6 +444,9 @@ def report(report_data: dict) -> None:
 
     print(f"thresholds: max {t['max_lines']} lines / {t['max_bytes']} bytes, "
           f"stale after {t['stale_months']} months")
+    print("note      : headings per file are in the JSON inventory "
+          "(`heading_count` / `headings`); a file may pass the line budget "
+          "and still fail the byte budget.")
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -22,9 +22,11 @@ The same four questions used here are used by `trellis-update-spec` when writing
 
 Add `--json` if you want to process the data yourself, `--root DIR` to point at another checkout, and `--stale-months N` / `--max-lines N` / `--max-bytes N` to change the thresholds.
 
-It reports, per spec file: path, lines, bytes, last-modified date, whether it declares `paths:`, whether an index links to it, and how many other specs name it. Plus: files over budget, stale files, duplicate paragraphs, dead references (repo paths, CLI flags and identifiers that do not appear anywhere in the code), narrative signals (dates, issue numbers, version numbers, incident stories), and index/file inconsistencies in both directions.
+It reports, per spec file: path, lines, bytes, heading count and headings, last-modified date, whether it declares `paths:`, whether an index links to it, and how many other specs name it. Plus: files over budget, stale files, duplicate paragraphs, dead references (file paths, `path:symbol` anchors, CLI flags and identifiers that do not appear anywhere in the code), narrative signals (dates, issue numbers, version numbers, incident stories), and index/file inconsistencies in both directions.
 
-Do not treat a finding as a verdict. A 2,000-line file may be legitimately large; a "dead flag" may be documented deliberately before it ships.
+It excludes `.trellis/spec/.review/` and `REVIEW-LOG.md` from the scan, and does not report paths that describe a user project's generated layout (`.opencode/…`, `.github/copilot/…`).
+
+Do not treat a finding as a verdict. A 2,000-line file may be legitimately large; a "dead" path may be an illustrative example in prose; a "dead flag" may be documented deliberately before it ships. Check before you cut, and say in the proposal which findings you rejected and why.
 
 ## Step 1: Classify every entry
 
@@ -52,21 +54,25 @@ Label each entry, with one line of reasoning:
 | PLACEHOLDER | template residue, "To be filled", empty heading | delete |
 | ASK | uncertain — for example, a guardrail that may be deliberate | put it to the user |
 
-Eight labels are a diagnostic vocabulary; they collapse into four actions: KEEP → keep; TIGHTEN and MERGE → compress; DERIVABLE, STALE, NARRATIVE, PLACEHOLDER → delete; ASK → ask. Write the proposal in terms of the four actions.
+Eight labels are a diagnostic vocabulary; they collapse into four actions: KEEP → keep; TIGHTEN and MERGE → compress; STALE → rewrite to the current state (delete it only when the entry should not exist at all); DERIVABLE, NARRATIVE, PLACEHOLDER → delete; ASK → ask. Write the proposal in terms of the four actions, and list rewrites and deletions separately so a rewrite is never approved as a deletion.
 
 ## Step 2: Check against the code
 
 For KEEP and TIGHTEN entries that assert something about the code, verify it: grep, read the file, look at the tests. Mark each VERIFIED, CONTRADICTED or UNVERIFIABLE. CONTRADICTED becomes STALE; UNVERIFIABLE becomes ASK.
 
+A claim that is false as written but true under a stated precondition counts as CONTRADICTED — narrow it to the precondition and label it STALE. Do not file it under VERIFIED because it works in the common case.
+
+Anchor every verification at a `file:line`. A spec this size reliably contains a few claims that were true when written and are not any more.
+
 ## Step 3: Proposal — stop here for approval
 
-Write `.trellis/spec/.review/<date>.md` and then stop. Do not edit a spec file in this step.
+Write `.trellis/spec/.review/<date>.md` (create the directory if it does not exist) and then stop. Do not edit a spec file in this step.
 
 - Per-file disposition table: entry → label → reason → estimated line change.
-- The merge list, the delete list, the rewrite list.
+- The merge list, the delete list, the rewrite list — kept separate.
 - The ASK list: one line each, "I judge X, but it could be Y — please confirm".
-- Totals before and after: files and lines.
-- Files that would benefit from a `paths:` frontmatter so injection can match them.
+- Totals before and after: files, lines, and bytes. A file can pass the line budget and still fail the byte budget (or the reverse); when they disagree, say so instead of reporting only the one that passed.
+- Files that would benefit from a `paths:` frontmatter so injection can match them — and whether the paths already declared actually cover the files the body cites.
 
 ## Step 4: Execute (after approval)
 
@@ -75,7 +81,7 @@ Apply only what was approved:
 - Write rewritten entries in Chinese, the language of spec bodies. Do not translate entries you are keeping just to change their language.
 - Update the index to match; add `paths:` where the proposal said to.
 - Delete the files that were approved for deletion — an unlinked seed file that does not apply is delete-on-sight, not a thing to fill in.
-- Append one line to `.trellis/spec/REVIEW-LOG.md`: date, file count, lines before and after, main actions, and the path of the proposal file.
+- Append one line to `.trellis/spec/REVIEW-LOG.md` (create it on first use): date, file count, lines before and after, main actions, and the path of the proposal file.
 
 ## Step 5: Wrap up
 
@@ -86,7 +92,7 @@ Re-run Step 0 and confirm the dead references, over-budget files and index misma
 ## Protections
 
 - **Pinned entries.** An entry may carry `<!-- pinned: <reason> -->`. A pinned entry may be TIGHTENed but never deleted or merged.
-- **Deletion cap.** A single review deletes at most 40% of the tree's lines (by default). Over that, split the work into two reviews — a mistaken mass deletion is expensive to notice.
+- **Deletion cap.** A single review deletes at most 40% of the tree's lines (by default). The cap is over the tree, not per file: cutting one 400-line file in half is 1-2% of the tree and is fine. Over the cap, split the work into two reviews — a mistaken mass deletion is expensive to notice.
 - **ASK means stop.** Anything on the ASK list that the user has not answered stays untouched.
 - **Git is the safety net.** Deleted content stays in history; `REVIEW-LOG.md` records the commit range so it can be found again.
 
