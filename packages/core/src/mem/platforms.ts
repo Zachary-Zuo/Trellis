@@ -24,6 +24,12 @@ import {
   releaseDevinSessionStore,
 } from "./adapters/devin.js";
 import {
+  collectDshTurnsAndEvents,
+  dshExtractDialogue,
+  dshListSessions,
+  dshSearch,
+} from "./adapters/dsh.js";
+import {
   collectGrokTurnsAndEvents,
   grokExtractDialogue,
   grokListSessions,
@@ -137,5 +143,14 @@ export const MEM_PLATFORMS: Record<MemSourceKind, MemPlatformAdapter> = {
     collect: (s, warnings) => collectDevinTurnsAndEvents(s, warnings),
     prepare: prepareDevinSessionStore,
     release: releaseDevinSessionStore,
+  },
+  dsh: {
+    phaseSupported: true,
+    list: (f) => dshListSessions(f),
+    extract: (s, warnings) => dshExtractDialogue(s, warnings),
+    search: (s, kw) => dshSearch(s, kw),
+    collect: (s, warnings) => collectDshTurnsAndEvents(s, warnings),
+    // No prepare/release: dsh sessions are plain per-session files, not a
+    // shared database that needs opening and closing around a fan-out.
   },
 };
