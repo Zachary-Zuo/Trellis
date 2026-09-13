@@ -22,7 +22,7 @@ Ask these about the fact you are considering, in order. Q1 is the strongest ques
 |---|---|---|
 | Q1 | Can this be read off the code in a minute? | Do not write it. At most leave one `file:line` pointer. |
 | Q2 | Would violating it cause an error no test catches, or did it come from a real incident? | Keep it as one line of rule plus the consequence of breaking it. Drop the story, dates, and issue numbers. |
-| Q3 | Is it a reason the code cannot express — a decision rationale, a rejected option, or a difference from the language / framework default? | Keep it, in at most 3 lines. |
+| Q3 | Is it a reason the code cannot express — a decision rationale, a rejected option, or a difference from the language / framework default? | Keep the reason, not the story behind it. |
 | Q4 | Is it an operational how-to? | Turn it into a script or a command, and leave one pointer to it. |
 
 All four answers "no": do not write the entry, and delete it if it already exists.

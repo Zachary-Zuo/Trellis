@@ -7,16 +7,14 @@ to approve the result before anything is written.
 
 Usage:
     python3 ./.trellis/scripts/spec_lint.py [--root DIR] [--json]
-                                            [--stale-months N]
-                                            [--large-lines N] [--large-bytes N]
 
-Exit code is 0 whenever the scan completed. Findings are data, not failure: a
-large spec file is not an error, it is a row in the report.
+Exit code is 0 whenever the scan completed. Findings are data, not failure.
 
-There is no size budget. Length is a symptom, not a criterion: a file that
-keeps growing is usually a file whose entries were never retired, and the
-question to ask is still "does this entry answer one of the four questions".
-Trimming to hit a number is the failure mode this tool exists to avoid.
+There is no size budget and no size threshold. Line and byte counts are
+reported as plain facts, sorted so the biggest files are visible; whether a
+file is "too big" is a judgement this script deliberately does not make. A spec
+shrinks because entries stopped answering the four questions, never because a
+number was reached.
 
 Why this is a script and not a checklist: every fact below is deterministic.
 Asking a model to `wc -l` and `grep -rn` across a spec tree costs a lot of
@@ -29,7 +27,7 @@ import argparse
 import json
 import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -39,12 +37,9 @@ from pathlib import Path
 SPEC_DIR_NAME = "spec"
 WORKFLOW_DIR_NAME = ".trellis"
 
-# NOT budgets. These are the sizes at which a spec file is worth a second look,
-# because a file that keeps growing is usually one whose entries were never
-# retired. There is deliberately no pass/fail line count.
-LARGE_FILE_LINES = 200
-LARGE_FILE_BYTES = 12 * 1024
-STALE_MONTHS = 3
+# The only number left is a detector threshold, not a content rule: paragraphs
+# shorter than this are labels and bullets, so comparing them for duplication
+# is noise.
 MIN_DUPLICATE_CHARS = 120
 
 # Frontmatter key that declares which source paths a spec governs.
@@ -217,12 +212,6 @@ def split_paragraphs(text: str) -> list[str]:
     return [p for p in re.split(r"\n\s*\n", body) if p.strip()]
 
 
-def month_cutoff(months: int) -> datetime:
-    now = datetime.now(timezone.utc)
-    # 30.44 days is the mean Gregorian month; precise enough for a review hint.
-    return now - timedelta(days=int(months * 30.44))
-
-
 # ---------------------------------------------------------------------------
 # Facts
 # ---------------------------------------------------------------------------
@@ -260,7 +249,7 @@ def scan(spec_root: Path, root: Path, args: argparse.Namespace) -> dict:
         p for p in spec_root.rglob("*.md")
         if p.is_file() and not (set(p.parts) & excluded) and p.name not in excluded
     )
-    cutoff = month_cutoff(args.stale_months)
+    cutoff = None
     code_blob = build_code_index(root)
 
     inventory: list[dict] = []
@@ -300,12 +289,11 @@ def scan(spec_root: Path, root: Path, args: argparse.Namespace) -> dict:
             "bytes": size,
             "modified": mtime.date().isoformat(),
             "has_paths": bool(PATHS_KEY_RE.search(text)),
-            "large": lines > args.large_lines or size > args.large_bytes,
-            "stale": mtime < cutoff,
             # Step 1 splits the file at H2/H3; having the list here saves the
             # reader from counting headings by hand.
             "heading_count": len(headings),
             "headings": headings,
+            "narrative_signals": 0,
         })
 
         # Duplicate paragraphs (normalized, long enough to be prose not a label).
@@ -395,18 +383,14 @@ def scan(spec_root: Path, root: Path, args: argparse.Namespace) -> dict:
     return {
         "spec_root": spec_root.relative_to(root).as_posix(),
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "thresholds": {
-            "large_lines": args.large_lines,
-            "large_bytes": args.large_bytes,
-            "stale_months": args.stale_months,
-        },
         "totals": {
             "files": len(inventory),
             "lines": sum(e["lines"] for e in inventory),
             "bytes": sum(e["bytes"] for e in inventory),
         },
-        "large_files": [e for e in inventory if e["large"]],
-        "stale": [e for e in inventory if e["stale"]],
+        # Size as a fact, largest first. No threshold, no pass/fail: this is
+        # here so a reviewer can see where the bulk is, not to set a target.
+        "by_size": sorted(inventory, key=lambda e: -e["bytes"]),
         "no_paths": [e for e in inventory if not e["has_paths"]],
         "unreferenced": [e for e in inventory if not e["referenced_by_index"]],
         "duplicate_paragraphs": duplicates,
@@ -443,12 +427,9 @@ def report(report_data: dict) -> None:
                 print("  " + render(row))
         print()
 
-    t = report_data["thresholds"]
-    section("large files (a prompt to look, not a limit)",
-            report_data["large_files"],
+    section("files by size, largest first (a fact, not a target)",
+            report_data["by_size"],
             lambda e: f"{e['lines']:>5} lines {e['bytes']:>7} B  {e['path']}")
-    section("stale", report_data["stale"],
-            lambda e: f"last modified {e['modified']}  {e['path']}")
     section("no `paths:` frontmatter", report_data["no_paths"],
             lambda e: e["path"])
     section("not linked from any index", report_data["unreferenced"],
@@ -470,8 +451,6 @@ def report(report_data: dict) -> None:
     section("index inconsistencies", report_data["index_inconsistencies"],
             lambda d: f"{d['kind']:<9} {d['target']}  (from {d['index']})")
 
-    print(f"attention thresholds: {t['large_lines']} lines / {t['large_bytes']} "
-          f"bytes (not limits), stale after {t['stale_months']} months")
     print("note      : headings per file are in the JSON inventory "
           "(`heading_count` / `headings`). Length is reported for context only; "
           "what stays in a spec is decided by the four questions, not by size.")
@@ -485,11 +464,6 @@ def main(argv: list[str] | None = None) -> int:
                         help="repo root; default: walk up from cwd for .trellis/")
     parser.add_argument("--json", action="store_true",
                         help="emit JSON instead of the human report")
-    parser.add_argument("--stale-months", type=int, default=STALE_MONTHS)
-    parser.add_argument("--large-lines", type=int, default=LARGE_FILE_LINES,
-                        help="report files longer than this; not a limit")
-    parser.add_argument("--large-bytes", type=int, default=LARGE_FILE_BYTES,
-                        help="report files larger than this; not a limit")
     args = parser.parse_args(argv)
 
     root = Path(args.root).resolve() if args.root else find_repo_root(Path.cwd())

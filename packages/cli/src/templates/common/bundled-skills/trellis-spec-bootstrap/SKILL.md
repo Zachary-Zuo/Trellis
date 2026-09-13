@@ -31,7 +31,7 @@ The gate `trellis-update-spec` applies to every later write applies to initial w
 |---|---|---|
 | Q1 | Can this be read off the code in a minute? | Do not write it. At most leave one `file:line` pointer. |
 | Q2 | Would violating it cause an error no test catches, or did it come from a real incident? | Keep it as one line of rule plus the consequence of breaking it. |
-| Q3 | Is it a reason the code cannot express — a decision rationale, a rejected option, or a difference from the language / framework default? | Keep it, in at most 3 lines. |
+| Q3 | Is it a reason the code cannot express — a decision rationale, a rejected option, or a difference from the language / framework default? | Keep the reason, not the story behind it. |
 | Q4 | Is it an operational how-to? | Turn it into a script or a command and leave one pointer. |
 
 All four answers "no": do not write the entry. Code is the source of truth; a spec earns its place only by holding what code cannot express.

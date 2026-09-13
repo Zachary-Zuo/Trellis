@@ -13,24 +13,12 @@ is active. It is intended for the main AI session, while sub-agent context
 normally arrives through `inject-subagent-context` on class-1 platforms or a
 pull-based prelude on class-2 platforms. Host behavior can still surface the
 breadcrumb inside sub-agent turns, though, and hooks do not currently expose a
-stable main-vs-sub-agent identity signal. Therefore: **breadcrumb text must be
-safe when read by a sub-agent** (self-exempting about dispatch).
-
-The older rule — "every `[required · once]` step must also be mentioned in that
-phase's breadcrumb tag block, and `test/regression.test.ts` enforces it" — has
-been **retired**. No such test ever existed (a repo-wide search finds
-`[required · once]` only inside `workflow.md` itself and as a literal fixture in
-`test/commands/update.integration.test.ts`), and the lightweight rewrite makes it
-unsatisfiable by design: the breadcrumbs are deliberately short. The replacement
-rule is about *injection reachability*, not about step coverage:
-
-- Anything a per-turn decision depends on must live either inside the
-  `## Phase Index` → `## Phase 1: Plan` range or inside a
-  `[workflow-state:*]` block. Everything else is loaded on demand and will not
-  be seen per turn.
-- Prose inside the injected range is a token tax paid every session; tag blocks
-  are stripped before injection and cost nothing there (but are paid per turn).
-  Keep step detail below `## Phase 1: Plan`.
+stable main-vs-sub-agent identity signal. Therefore: **every `[required · once]`
+step that the workflow-walkthrough mandates for a given phase must also be
+mentioned in that phase's breadcrumb tag block, and breadcrumb text must be
+safe when read by a sub-agent.** If required gates are absent, the AI in the
+main session will silently skip them. Prior bugs around planning gates and
+Phase 3.4 commit reminders hit exactly this failure mode.
 
 This document is the source of truth for the runtime mechanics. The user-facing
 breadcrumb body lives in `.trellis/workflow.md` — or in the active task's
@@ -449,10 +437,9 @@ nested Trellis sub-agents.
   markers outside those tags are runtime input too.
 - Add a writer-table row to this spec when introducing a new status writer.
 - Run the regression tests after editing breadcrumb bodies.
-- When adding content a per-turn decision depends on, put it inside the
-  `## Phase Index` → `## Phase 1: Plan` range or in a `[workflow-state:*]`
-  block. The old "every `[required · once]` step needs a breadcrumb line" rule
-  is retired (see Overview) — do not reintroduce it.
+- When adding a `[required · once]` step to the workflow walkthrough, add a
+  matching enforcement line to that phase's breadcrumb tag block in the
+  same commit.
 
 ## DON'T
 

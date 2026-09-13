@@ -20,9 +20,9 @@ The same four questions used here are used by `trellis-update-spec` when writing
 {{PYTHON_CMD}} ./.trellis/scripts/spec_lint.py
 ```
 
-Add `--json` if you want to process the data yourself, `--root DIR` to point at another checkout, and `--stale-months N` / `--max-lines N` / `--max-bytes N` to change the thresholds.
+Add `--json` if you want to process the data yourself, or `--root DIR` to point at another checkout.
 
-It reports, per spec file: path, lines, bytes, heading count and headings, last-modified date, whether it declares `paths:`, whether an index links to it, and how many other specs name it. Plus: unusually large files, stale files, duplicate paragraphs, dead references (file paths, `path:symbol` anchors, CLI flags and identifiers that do not appear anywhere in the code), narrative signals (dates, issue numbers, version numbers, incident stories), and index/file inconsistencies in both directions.
+It reports, per spec file: path, lines, bytes, heading count and headings, last-modified date, whether it declares `paths:`, whether an index links to it, and how many other specs name it — with every file listed largest first, as a fact rather than a target. Plus: duplicate paragraphs, dead references (file paths, `path:symbol` anchors, CLI flags and identifiers that do not appear anywhere in the code), narrative signals (dates, issue numbers, version numbers, incident stories), and index/file inconsistencies in both directions.
 
 It excludes `.trellis/spec/.review/` and `REVIEW-LOG.md` from the scan, and does not report paths that describe a user project's generated layout (`.opencode/…`, `.github/copilot/…`).
 
@@ -38,7 +38,7 @@ Split each spec file into entries at the H2/H3 level, then ask the four question
 |---|---|---|
 | Q1 | Can you get the same information by reading the code for a minute? | Do not keep it. At most leave a pointer: "see `path/file.py`". |
 | Q2 | Does violating it cause a failure no test would catch, or does it come from a real incident? | Keep, as one line of rule plus the consequence. Drop narrative, dates, issue numbers. |
-| Q3 | Is it a reason the code cannot express — a decision, a rejected alternative, a departure from the language/framework default? | Keep, ≤ 3 lines. |
+| Q3 | Is it a reason the code cannot express — a decision, a rejected alternative, a departure from the language/framework default? | Keep the reason, not the story behind it. |
 | Q4 | Is it a how-to? | Turn it into a script or command; the spec keeps one line pointing at it. |
 
 Q1 is the strongest question — ask it first. An entry that answers "no" to all four is deleted.
