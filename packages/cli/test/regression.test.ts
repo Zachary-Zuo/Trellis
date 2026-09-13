@@ -7741,38 +7741,41 @@ print(len(entries))
     }
   });
 
-  it("[workflow-state-r2] template workflow.md [workflow-state:planning] mentions artifact gates + required jsonl curation", () => {
+  it("[workflow-state-r2] template workflow.md [workflow-state:planning] states the single task shape and the approval gate", () => {
     const wf = templateWorkflowMd();
     const match = wf.match(
       /\[workflow-state:planning\]([\s\S]*?)\[\/workflow-state:planning\]/,
     );
     expect(match).toBeTruthy();
     const body = match?.[1] ?? "";
-    expect(body).toMatch(/Lightweight: `prd\.md` can be enough/);
-    expect(body).toMatch(
-      /Complex: finish `prd\.md`, `design\.md`, and `implement\.md`/,
-    );
+    // Reversal of the lightweight/complex tier split (drafts/workflow-lite-plan.md
+    // §3.1, §6.1): there is one task shape, and artifacts are approved before
+    // the status flips. A genuinely tiny change does not create a task at all.
+    expect(body).toMatch(/There is one task shape/);
     expect(body).toContain(
-      "curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start",
+      "Finish `prd.md`, `design.md`, and `implement.md`; present the planning summary and wait for approval before `task.py start`.",
     );
+    expect(body).not.toMatch(/Lightweight: `prd\.md` can be enough/);
   });
 
-  it("[#292] workflow and brainstorm templates treat seed-only jsonl as not planning-ready", () => {
+  it("[#292-reversed] workflow context manifests are optional; only sub-agent dispatch needs them", () => {
     const wf = templateWorkflowMd();
-    expect(wf).not.toContain("seed-only manifests are tolerated by consumers");
+    // Reversal of the #292 ready gate (drafts/workflow-lite-plan.md §6.1):
+    // `task.py start` is no longer blocked on curated manifests, and filling
+    // them is an optional step for sub-agent dispatch only. The main session
+    // receives specs through path-based injection instead.
     expect(wf).not.toContain(
-      "curated when extra spec or research context is needed",
-    );
-    expect(wf).toContain(
       'Ready gate: both `implement.jsonl` and `check.jsonl` must contain at least one real `{"file": "...", "reason": "..."}` entry before `task.py start`.',
     );
-    expect(wf).toContain(
+    expect(wf).not.toContain(
       "Runtime consumers tolerate missing or seed-only manifests for compatibility, but that tolerance is not a planning-ready state.",
     );
-    expect(wf).toContain(
-      "`implement.jsonl` and `check.jsonl` each contain at least one real curated entry (seed row does not count)",
-    );
+    expect(wf).toContain("#### 1.3 Context manifests `[optional · once]`");
+    expect(wf).toContain("--allow-empty-context");
 
+    // The brainstorm skill and its copilot prompt still carry the pre-reversal
+    // wording; they are updated together with the rest of the skill text in a
+    // later slice. Pinned here so the two sides cannot drift silently.
     const templateRoot = path.join(
       path.dirname(fileURLToPath(import.meta.url)),
       "..",
@@ -7912,9 +7915,16 @@ print(len(entries))
     );
 
     expect(output).toContain("## Phase Index");
-    expect(output).toContain("### Request Triage");
-    expect(output).toContain("### Planning Artifacts");
+    // The Phase Index range is now a lean orientation payload: the ASCII
+    // summary, the two-mode table, routing, rules, and the step-detail hint.
+    // Planning prose (Request Triage / Planning Artifacts / Parent-Child) moved
+    // below `## Phase 1: Plan` so it is loaded on demand instead of every
+    // session — see drafts/workflow-lite-plan.md §3.1.
+    expect(output).toContain("### Two modes");
+    expect(output).toContain("### Active Task Routing");
     expect(output).toContain("### Loading Step Detail");
+    expect(output).not.toContain("### Request Triage");
+    expect(output).not.toContain("### Planning Artifacts");
     expect(output).not.toMatch(/^## Phase 1: Plan/m);
     expect(output).not.toContain("#### 1.1 Requirement exploration");
     expect(output).not.toContain("#### 2.1 Implement");
@@ -7969,7 +7979,9 @@ print(len(entries))
     );
 
     expect(output).toContain("trellis-implement");
-    expect(output).toContain("implement.jsonl");
+    // Manifests are optional now, so the Phase Index payload no longer names
+    // `implement.jsonl`; the routing bullet is what this test is about.
+    expect(output).toContain("dispatch `trellis-implement` / `trellis-check`");
     expect(output).not.toContain(
       "| About to write code / start implementing | trellis-before-dev |",
     );
@@ -8084,11 +8096,16 @@ print(len(entries))
     const workflowBlock = workflowMatch[1];
 
     expect(workflowBlock).toContain("## Phase Index");
-    expect(workflowBlock).toContain("### Request Triage");
-    expect(workflowBlock).toContain("### Planning Artifacts");
+    expect(workflowBlock).toContain("### Two modes");
+    expect(workflowBlock).toContain("### Active Task Routing");
     expect(workflowBlock).toContain("### Loading Step Detail");
+    expect(workflowBlock).not.toContain("### Request Triage");
+    expect(workflowBlock).not.toContain("### Planning Artifacts");
     expect(workflowBlock).not.toMatch(/^## Phase 1: Plan/m);
     expect(workflowBlock).not.toContain("#### 1.1 Requirement exploration");
+    // Token budget: the whole orientation payload stays under 2 KB. It was
+    // ~6.5 KB before the lite rewrite (drafts/workflow-lite-plan.md §3.2).
+    expect(Buffer.byteLength(workflowBlock, "utf-8")).toBeLessThan(2048);
     // Breadcrumb tag BLOCKS (matched opening + closing pair) excluded — they're
     // consumed by inject-workflow-state.py. Inline `[workflow-state:planning]`
     // mentions in narrative prose are fine; only complete blocks are stripped.
