@@ -184,7 +184,8 @@ MERGE（见下）：#9、#29。
 1. **`### Tag flag (--tag <beta|rc|latest>)`（`:155-158`）** —— 我判断保留（用户会问“为什么没有 `--tag`”，一行负事实省一次排查），但也可能是已移除 flag 的残留、应当删除。请确认。
 2. **`### Breaking + recommendMigrate must ship migrationGuide`（`:310-313`）** —— 我判断属 NARRATIVE，删掉 `0.5.0-beta.0` → `0.5.0-beta.9` 的版本史、只留规则与 `create-manifest.js --stdin` 的硬失败；但这段历史可能正是“为什么有这个守卫”的解释，请确认保留到什么程度。
 3. **`paths:` 的覆盖范围** —— 本文件现在只声明 `packages/cli/src/commands/update.ts`，而按路径校验它必须打开 `migrations/index.ts`、`configurators/index.ts`、`configurators/shared.ts`、`utils/template-hash.ts`、`cli/index.ts` 才能核。我判断应补前三个；但补得越多，按路径注入越大（与 P4 冲突）。请确认。
-4. **双预算是否都要满足** —— 本提案把 411 行压到 ≈202 行（达标），但字节从 35.5 KB 只降到 ≈17.8 KB，**仍超 12 KB 预算 45%**。要同时达标，需要再删 ≈5.5 KB，即把 #19 `Boundaries with init` 整节与 #22-#24 的 Pitfalls 一并删除（会损失 Q2/Q3 级内容）。我判断 CLI backend 类文件应使用 200 行 / 20 KB 的双档预算，或接受“先过行数、字节下轮再压”。请确认。
+4. **~~双预算是否都要满足~~（已决：不设预算，本项撤销）** —— 原提案按“200 行 / 12 KB”给出 ≈202 行 / ≈17.8 KB，并指出字节仍超 45%、要达标需再删 ≈5.5 KB 的 Q2/Q3 级内容。**该预算已从设计与方法中移除**（见 `drafts/workflow-lite-plan.md` §9.6）：按行数/字节裁剪会逼人牺牲正确性，用户已明确不要硬行数控制，重点是功能正确。
+   因此：§3 的处置**全部按四问成立**（逐条理由本来就是 Q1/Q2/Q3/Q4，不是为凑数），`#19 Boundaries with init` 与 `#22-#24` 的 Pitfalls **不再为字节预算而删**——删不删只看四问。削减量按内容走，不再承诺 ≈202 行 / ≈17.8 KB 这两个数。
 
 ---
 

@@ -341,7 +341,7 @@ Codex 的 `SubagentStart` 注入与 dsh 的 pull 式加载沿用现有实现。
 - 写入条件：只有三种——踩到非显而易见的坑；做了未来会话必须知道的决策；约定与语言/框架默认不同。写入前过 §4.2 四问。
 - 写入语言：正文中文（§0.4）。
 - 三种动作：add / modify / remove。每次写入先回答"这条替代或废止了现有哪条"，并执行对应的 modify / remove。
-- 单文件预算 200 行 / 12 KB，超了先删再加。
+- 体量不是判据：不设行数 / 字节预算。"文件太长"本身不是删除理由——长度是症状，通常是该退休的条目没退休。唯一的收缩规则是"每次写入必须点名它替代或废止了哪条"。若一个文件很长但每条都答得出四问，就让它长着。
 - 保留的短模板：Convention、Don't、Common Mistake、Design Decision，各 ≤ 8 行。
 - 新 checklist 5 项：是否可从代码直接推出（是则不写）；是否已有等价条目；是否替代了旧条目；是否超预算；是否含 file:line 证据。
 
@@ -507,9 +507,9 @@ PRD 骨架（aee145b3 已提交的中文版，本稿只改标 ★ 的两处）�
 | `generic` 种子 | 随上一行第二版；形态是 `spec/<pkg>/index.md` + `conventions.md` + `verification.md`（检查命令、什么算验证通过），中文 | 三个文件够覆盖 P7 允许留在 spec 里的东西 |
 | web 类型种子（backend / frontend 共 13 个文件：backend 6 + frontend 7） | 正文改中文；删三处 "All documentation should be written in English"（`spec/backend/index.md.txt` 行 38、`spec/frontend/index.md.txt` 行 39、`workspace-index.md` 行 125） | §0.4 |
 | `guides/` 合并后的 `thinking-triggers.md` | 中文 | §0.4 |
-| bootstrap 任务描述（init.ts 行 397-543） | 中文；"只写代码库能证明的约定；不适用的文件删除；每文件 ≤ 200 行；写入前过四问"；删"每个任务都派两个子代理、hook 自动注入 jsonl"那段运行时说明 | 现文英文；"空 spec 等于子代理写通用代码"驱动填满；主会话默认后子代理说法失真 |
+| bootstrap 任务描述（init.ts 行 397-543） | 中文；"只写代码库能证明的约定；不适用的文件删除；写入前过四问"（**不设行数上限**）；删"每个任务都派两个子代理、hook 自动注入 jsonl"那段运行时说明 | 现文英文；"空 spec 等于子代理写通用代码"驱动填满；主会话默认后子代理说法失真 |
 | index.md 模板 | 中文；文件表加一列"何时读"；删 How to Fill 里"加代码示例、列团队常见错误"两条 | 那两条是填满驱动；index 只需是地图 |
-| 单文件预算 | 200 行 / 12 KB，由 spec-review 报告 | P4 |
+| 单文件体量 | 只报告，不设限。超过 200 行 / 12 KB 的文件列出来供人看一眼，由 spec-review 输出 | P4 |
 
 **删除项与理由**
 
@@ -603,7 +603,7 @@ PRD 骨架（aee145b3 已提交的中文版，本稿只改标 ★ 的两处）�
 | 清单 | 每个 spec 文件：路径、行数、字节、最后修改日期、是否有 `paths:`、是否被 index 引用、被其他 spec 引用次数 |
 | 死引用 | spec 正文里出现的仓库路径、函数名、类名、CLI 旗标，在代码里不存在的 |
 | 重复 | 规范化后相同的段落（跨文件与文件内） |
-| 超预算 | 超过 200 行 / 12 KB 的文件 |
+| 体量 | 超过 200 行 / 12 KB 的文件（**仅供参考，不是门禁**） |
 | 陈旧 | 超过 N 个月未改的文件（N 默认 3） |
 | 叙事信号 | 含日期、issue 号、版本号、"cautionary tale"、"scenario" 的段落数 |
 | 索引一致性 | index.md 条目与实际文件双向核对 |
@@ -650,8 +650,7 @@ PRD 骨架（aee145b3 已提交的中文版，本稿只改标 ★ 的两处）�
 ### 4.5 保护机制
 
 - 条目可加 `<!-- pinned: <reason> -->` 注释；review 只能 TIGHTEN 不能删或合并。
-- 单次 review 删除量上限（默认 40% 行数）；超过分两次做，减少一次误删。
-- 删除内容留在 git 历史；REVIEW-LOG 记录 commit 范围，便于回找。
+- 不设删除量上限。删除内容留在 git 历史；REVIEW-LOG 记录 commit 范围，便于回找。若一次 review 想删的东西让人不放心，就把提案拆成几段，让用户分段批准。
 - ASK 条目未获答复的一律不动。
 
 ### 4.6 与其他部分的关系
@@ -734,7 +733,7 @@ PRD 骨架（aee145b3 已提交的中文版，本稿只改标 ★ 的两处）�
 3. Parent / child 任务树是否保留？建议保留机制，不在 breadcrumb 里提。
 4. `generic` 项目类型的三个种子文件名与内容是否合适？
 5. design.md / implement.md 模板段落是否合适？
-6. spec-review 的单文件预算（200 行 / 12 KB）与单次删除上限（40%）是否合适？
+6. （v6 已决）**不设单文件预算**，也不用删除量上限。按行数/字节裁剪会逼人删掉 Q2/Q3 级（违反会导致测试抓不到的错、或代码表达不出的决策）的内容——试点里已经出现过这种取舍压力。判据只有四问。
 7. `pinned` 注释语法是否接受，还是用 frontmatter 字段？
 8. `trellis init` 的平台选择器仍列 22 个平台。是否需要在 fork 里把默认勾选改为三平台？建议改默认勾选，不删条目。
 9. （v5 新增）档 A 的会话级免确认开关（§2.2）由哪些话触发？建议只认明确措辞（"别问""直接改""不用复述"），且只在当前会话有效；不接受 agent 自行推断。
@@ -802,7 +801,7 @@ PRD 骨架（aee145b3 已提交的中文版，本稿只改标 ★ 的两处）�
 | `opencode/lib/session-utils.js`、`opencode/plugins/session-start.js`、`pi/extensions/trellis/index.ts.txt` | 同上删除；opencode 里那条用于剥离该块的死正则与 helper 一并移除 | — |
 | `common/skills/brainstorm.md`（195 → 205 行） | §3.3.1 全部：五类提问按序、偏差信号表、先告知再问、一次一个决策点；删 `Non-Negotiable` 与"至少一轮往返"；删 `## PRD Convergence Pass`；删 jsonl 门禁与轻量/复杂二分；补语言规则与 design/implement 短模板 | 技能保持英文 |
 | `common/skills/check.md`（106 → 76） | §3.3.2 重写：对照验收标准给证据；删"逐包读 index 的 Quality Check"、`Test Coverage` 三项、`Spec Sync` 复选框、`Cross-Layer Dimensions` 四节（改为指向 `guides/thinking-triggers.md`）；保留 scope discipline 五项 | — |
-| `common/skills/update-spec.md`（351 → 81） | §3.3.3 delta 语义：三种写入条件、四问门禁、add/modify/remove 且必须点名被替代的旧条目、200 行/12 KB 预算、4 个短模板、5 项 checklist（2 项是减法）；删 `Code-Spec First Rule`、`Mandatory Triggers`、7 段模板、旧 checklist、`Core Philosophy` | ≤120 行目标达成 |
+| `common/skills/update-spec.md`（351 → 81） | §3.3.3 delta 语义：三种写入条件、四问门禁、add/modify/remove 且必须点名被替代的旧条目、4 个短模板、5 项 checklist（2 项是减法）；删 `Code-Spec First Rule`、`Mandatory Triggers`、7 段模板、旧 checklist、`Core Philosophy` | 行数目标已于 v6 取消，见 §9.6 |
 | `common/skills/before-dev.md`（46 → 41） | 第 4 步不再引用不存在的 `Pre-Development Checklist`；第 6 步并入第 5 步并按需触发；删末行 `mandatory` | — |
 | `common/commands/{continue,start,finish-work}.md` | 删轻量/复杂二分与每轮征求同意；`start` 的"无任务"分支改为档 A 默认；`finish-work` 写明"调用即同意归档" | — |
 | 21 平台的 `trellis-check` / `trellis-implement` 定义（33 个文件） | 规则一：机械问题就地修、判断问题上报 + reviewer 约束；规则二：改为"跑与改动相关的检查" | 方案原以为"三平台各一份"，实际 21 平台 × 3 角色 |
@@ -816,7 +815,7 @@ PRD 骨架（aee145b3 已提交的中文版，本稿只改标 ★ 的两处）�
 ### 9.2 第 3 片：spec-review
 
 - 新增 `templates/trellis/scripts/spec_lint.py`（359 行，只算事实：清单/超预算/陈旧/死引用/重复段落/叙事信号/索引一致性；支持 `--json`、`--root`、`--stale-months`、`--max-lines`、`--max-bytes`），已注册进 `templates/trellis/index.ts` 的 `getAllScripts()`，并同步到 `.trellis/scripts/`（有一条逐字节一致性测试）
-- 新增 `common/commands/spec-review.md`（§4 全流程：四问判据、八个诊断标签归四个动作、Step 0–5、pinned / 40% 删除上限 / ASK / REVIEW-LOG 保护）
+- 新增 `common/commands/spec-review.md`（§4 全流程：四问判据、八个诊断标签归四个动作、Step 0–5、pinned / ASK / REVIEW-LOG 保护；**无删除上限**）
 - `configurators/shared.ts` 补 `COMMAND_DESCRIPTIONS` 与 `SKILL_DESCRIPTIONS` 条目
 
 **实测（`spec_lint.py --root .`）**：42 文件 / **19,594 行** / 1.03 MB，其中 **30 个文件超预算**；`platform-integration.md` 2,370 行 / 197,630 B，`script-conventions.md` 2,860 行 / 132,069 B。
@@ -870,7 +869,26 @@ PRD 骨架（aee145b3 已提交的中文版，本稿只改标 ★ 的两处）�
 
 试点同时确认了两件设计上的事：四问判据在真实文件上可执行、无需猜测；**`stale`（按 mtime 超 3 个月）在全新 checkout 或批量 touch 后结构性恒为 0**，此时它不携带任何信号——保留但不可依赖。
 
-### 9.6 遗留
+### 9.6 v6：取消全部"硬行数控制"（用户决定）
+
+用户的判断：**按行数/字节裁剪不是功能正确性判据**。试点里第 4 条 ASK 正是被预算逼出来的——提案已从 411 行压到 202 行，为再凑 12 KB 就得删 Q2/Q3 级内容（违反会导致测试抓不到的错、或代码表达不出的决策），属于为指标牺牲正确性。已从设计与方法中移除：
+
+| 位置 | 改动 |
+|---|---|
+| `spec_lint.py` | `MAX_LINES`/`MAX_BYTES` → `LARGE_FILE_LINES`/`LARGE_FILE_BYTES`；`over_lines`/`over_bytes`/`over_budget` → `large`/`large_files`；参数 `--max-lines/--max-bytes` → `--large-lines/--large-bytes`；报告标题改为 "large files (a prompt to look, not a limit)"；模块 docstring 明确"没有大小预算，长度是症状不是判据" |
+| `commands/spec-review.md` | 增写"没有大小预算，体量不是判据……绝不为凑数删规则、约束或决策"；前后对比改为"仅供参考，不是目标"；**删除 40% 删除量上限**，改为"不设数字上限，拿不准就把提案拆段让用户分段批准"；触发时机的"超预算"改为"死引用/重复段落/长出没人读的长度" |
+| `skills/update-spec.md` + copilot 镜像 | `## Budget` 节改为 `## Size`：不设预算，长度是症状，唯一收缩规则是"每次写入点名被替代/废止的条目"；checklist 第 4 项由"是否超预算"改为"**是否已过时**（是否仍描述代码现在做的事，核验不出来的要说明而不是当事实写）" |
+| 本文件 §3.3.3 / §3.5 / §4.4 / §4.5 / §7.6 | 同步移除预算与上限；§7.6 标记为已决 |
+
+保留的两处"预算"与 spec 体量无关，是有真实硬约束的：`spec_inject.py` 的注入字符预算（宿主 `additionalContext` 上限），以及 `spec_match.py` 扫描文件头 16 KiB / 200 行的边界。
+
+### 9.7 修 `spec_lint.py` 时发现的自身缺陷
+
+改索引范围时暴露了一个**自指 bug**：`build_code_index` 原来把 `.md` 也当代码索引，于是"某个权威文档提到了这个旧符号"就等于"这个符号存在于代码里"——方案文档 §9.5 里写了 `replaceTrellisManagedBlock`，检查立刻就不报它了。已把索引收窄为 `CODE_ONLY_EXTENSIONS`（纯代码扩展名），散文不再能把失效符号洗白。修正后 `dead anchors` 0 → 2、`identifiers` 13 → 36，多出来的都是先前被 changelog / migration manifest / 其他 spec 的引用掩盖掉的真失效。
+
+另修一处分类错误：`--flag` 检查原假设"每个 `--flag` 都是 Trellis 的"，于是把 git 的 `--init`、`--name-status`、`--recursive` 报成"Trellis 死旗标"。已收紧为只检查出现在 `.trellis/scripts/` 或 `trellis ` 命令行上的旗标，死旗标 18 → 2。
+
+### 9.8 遗留
 
 - `transcriptHasAssistantMessage`（`opencode/lib/context-visibility.js:121`）在本次改动后全仓无引用，但它是导出函数，删除属独立清理，未动。
 - 4 条 `[worktree-identity]` 测试在全套并行跑时偶发失败，单独跑 9/9 通过——并行 git 操作的测试环境问题，与本改动无关。
