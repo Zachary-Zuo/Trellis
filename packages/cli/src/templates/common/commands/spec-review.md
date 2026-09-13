@@ -22,11 +22,13 @@ The same four questions used here are used by `trellis-update-spec` when writing
 
 Add `--json` if you want to process the data yourself, `--root DIR` to point at another checkout, and `--stale-months N` / `--max-lines N` / `--max-bytes N` to change the thresholds.
 
-It reports, per spec file: path, lines, bytes, heading count and headings, last-modified date, whether it declares `paths:`, whether an index links to it, and how many other specs name it. Plus: files over budget, stale files, duplicate paragraphs, dead references (file paths, `path:symbol` anchors, CLI flags and identifiers that do not appear anywhere in the code), narrative signals (dates, issue numbers, version numbers, incident stories), and index/file inconsistencies in both directions.
+It reports, per spec file: path, lines, bytes, heading count and headings, last-modified date, whether it declares `paths:`, whether an index links to it, and how many other specs name it. Plus: unusually large files, stale files, duplicate paragraphs, dead references (file paths, `path:symbol` anchors, CLI flags and identifiers that do not appear anywhere in the code), narrative signals (dates, issue numbers, version numbers, incident stories), and index/file inconsistencies in both directions.
 
 It excludes `.trellis/spec/.review/` and `REVIEW-LOG.md` from the scan, and does not report paths that describe a user project's generated layout (`.opencode/…`, `.github/copilot/…`).
 
-Do not treat a finding as a verdict. A 2,000-line file may be legitimately large; a "dead" path may be an illustrative example in prose; a "dead flag" may be documented deliberately before it ships. Check before you cut, and say in the proposal which findings you rejected and why.
+**There is no size budget, and size is not a criterion.** Length is a symptom: a spec file that keeps growing is usually one whose entries were never retired. The reason to cut an entry is that it fails the four questions — never that the file is long. Never trim a rule, a constraint or a decision to reach a number; if a file is large and every entry still answers a question, leave it alone and say so in the proposal.
+
+Do not treat a finding as a verdict. A "dead" path may be an illustrative example in prose; a "dead flag" may be documented deliberately before it ships. Check before you cut, and say in the proposal which findings you rejected and why.
 
 ## Step 1: Classify every entry
 
@@ -71,7 +73,7 @@ Write `.trellis/spec/.review/<date>.md` (create the directory if it does not exi
 - Per-file disposition table: entry → label → reason → estimated line change.
 - The merge list, the delete list, the rewrite list — kept separate.
 - The ASK list: one line each, "I judge X, but it could be Y — please confirm".
-- Totals before and after: files, lines, and bytes. A file can pass the line budget and still fail the byte budget (or the reverse); when they disagree, say so instead of reporting only the one that passed.
+- Totals before and after: files, lines, and bytes — reported for context, not as a target. If you kept a large file large, say why.
 - Files that would benefit from a `paths:` frontmatter so injection can match them — and whether the paths already declared actually cover the files the body cites.
 
 ## Step 4: Execute (after approval)
@@ -85,23 +87,22 @@ Apply only what was approved:
 
 ## Step 5: Wrap up
 
-Re-run Step 0 and confirm the dead references, over-budget files and index mismatches you targeted are gone. Report the before/after totals. Commit the spec changes as one commit — the proposal was approved in Step 3, so no second confirmation is needed.
+Re-run Step 0 and confirm the findings you targeted are gone. Report the before/after totals. Commit the spec changes as one commit — the proposal was approved in Step 3, so no second confirmation is needed.
 
 ---
 
 ## Protections
 
 - **Pinned entries.** An entry may carry `<!-- pinned: <reason> -->`. A pinned entry may be TIGHTENed but never deleted or merged.
-- **Deletion cap.** A single review deletes at most 40% of the tree's lines (by default). The cap is over the tree, not per file: cutting one 400-line file in half is 1-2% of the tree and is fine. Over the cap, split the work into two reviews — a mistaken mass deletion is expensive to notice.
 - **ASK means stop.** Anything on the ASK list that the user has not answered stays untouched.
-- **Git is the safety net.** Deleted content stays in history; `REVIEW-LOG.md` records the commit range so it can be found again.
+- **Git is the safety net.** Deleted content stays in history; `REVIEW-LOG.md` records the commit range so it can be found again. There is no numeric deletion cap — if a review proposes deleting something you are unsure about, split the proposal so you can approve it in stages.
 
 ## When to run this
 
 - When the count of archived tasks since the last review reaches about ten.
 - Before a large feature, so stale specs do not supply wrong constraints.
 - When path-based injection surfaces a spec that contradicts the code.
-- When Step 0 reports over-budget files or dead references.
+- When Step 0 reports dead references, duplicate paragraphs, or a file that has grown past the point where anyone reads it.
 - Routinely: once a quarter.
 
 ---

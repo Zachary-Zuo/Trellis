@@ -27,9 +27,9 @@ All four answers "no": do not write the entry, and delete it if it already exist
 
 Every write names the existing entry it replaces or retires, and you then modify or remove that entry in the same pass. A spec records current state, not history: an entry that no longer holds is removed, not kept with a note that it is superseded.
 
-## Budget
+## Size
 
-200 lines or 12 KB per file, whichever comes first. Over budget: delete before you add. The overage never carries over to the next entry.
+There is no line or byte budget, and you must never trim a rule, a constraint or a decision to reach one. Length is a symptom: a spec file that keeps growing is usually one whose entries were never retired. The only shrinking rule is the one above — every write names the entry it replaces or retires, and that entry goes. If a file is long and every entry still answers a question, leave it long.
 
 ## Templates
 
@@ -72,7 +72,7 @@ Five checks, in this order. The first two are subtractions; they come before the
 1. **Derivable?** Could a reader get this from the code in a minute? Then do not write it; leave a `file:line` pointer at most.
 2. **Already there?** Is there an equivalent entry in this file or a neighbouring one? Merge into it instead of adding a near-duplicate.
 3. **Replaces or retires what?** Which existing entry does this write replace or retire, and did you actually modify or remove that entry?
-4. **Over budget?** Is the file still within 200 lines / 12 KB after the write?
+4. **Stale?** Does the entry still describe what the code does now? Verify it rather than assuming — and if you cannot verify it, say so instead of writing it as fact.
 5. **Evidence?** Does the entry carry a `file:line`, a command, or a concrete symbol, instead of abstract advice?
 
 ## Related
