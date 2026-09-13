@@ -34,17 +34,19 @@ import {
 
 /**
  * Command templates that become user-invocable dsh skills
- * (loaded by their `trellis-<name>` skill names). The session-boundary
- * commands are delivered as SKILL.md files in DSH's private project root.
+ * (loaded by their `trellis-<name>` skill names). dsh has no slash-command
+ * mechanism besides skills, so every command that should be reachable in a
+ * dsh project has to be listed here — not just the session-boundary ones.
  */
 const DSH_COMMAND_SKILL_NAMES = new Set([
   "trellis-start",
   "trellis-continue",
   "trellis-finish-work",
+  "trellis-spec-review",
 ]);
 
-/** Session-boundary commands resolved as dsh skills (dsh-private root, so
- *  platform-specific `{{CLI_FLAG}}` / `{{CMD_REF}}` resolution is correct). */
+/** Commands resolved as dsh skills (dsh-private root, so platform-specific
+ *  `{{CLI_FLAG}}` / `{{CMD_REF}}` resolution is correct). */
 function resolveDshCommandSkills(): ReturnType<typeof resolveAllAsSkills> {
   const ctx = AI_TOOLS.dsh.templateContext;
   return resolveAllAsSkills(ctx).filter((skill) =>

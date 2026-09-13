@@ -34,16 +34,18 @@ import {
 /**
  * Command templates that become user-invocable Kimi skills
  * (`/skill:trellis-<name>`). Kimi has no slash-command mechanism besides
- * skills, so the session-boundary commands are delivered as SKILL.md files.
+ * skills, so every command that should be reachable in a Kimi project has to
+ * be listed here — not just the session-boundary ones.
  */
 const KIMI_COMMAND_SKILL_NAMES = new Set([
   "trellis-start",
   "trellis-continue",
   "trellis-finish-work",
+  "trellis-spec-review",
 ]);
 
-/** Session-boundary commands resolved as Kimi skills (Kimi-private root, so
- *  platform-specific `{{CLI_FLAG}}` / `{{CMD_REF}}` resolution is correct). */
+/** Commands resolved as Kimi skills (Kimi-private root, so platform-specific
+ *  `{{CLI_FLAG}}` / `{{CMD_REF}}` resolution is correct). */
 function resolveKimiCommandSkills(): ReturnType<typeof resolveAllAsSkills> {
   const ctx = AI_TOOLS.kimi.templateContext;
   return resolveAllAsSkills(ctx).filter((skill) =>
