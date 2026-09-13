@@ -52,6 +52,8 @@ Then route:
 
 ## Step 3: Archive task(s)
 
+Invoking this command IS the user's consent to archive. Do not ask again for the active task.
+
 ```bash
 python3 ./.trellis/scripts/task.py archive <task-name>
 ```

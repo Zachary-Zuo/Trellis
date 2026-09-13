@@ -25,7 +25,7 @@ Before implementing, read in this order:
 1. **Understand specs** — read relevant spec files in `.trellis/spec/`
 2. **Understand task artifacts** — read the artifacts listed above
 3. **Implement features** — write code that follows specs and existing patterns
-4. **Self-check** — run lint and typecheck on the changed scope before reporting
+4. **Self-check** — run the checks related to the change: lint, type-check, existing tests covering the touched code — before reporting
 
 ## Forbidden Operations
 
@@ -40,7 +40,7 @@ The supervising main session owns commits. Report what changed; do not commit on
 1. Read relevant specs based on task type and the files in `implement.jsonl` if present
 2. Read the task's `prd.md`, `design.md` if present, and `implement.md` if present
 3. Implement features following specs and existing patterns
-4. Run the project's lint and typecheck commands on the changed scope
+4. Run the checks related to the change: lint, type-check, and existing tests that cover the touched code
 5. Report files touched, key decisions, and verification results back to the channel
 
 ## Code Standards

@@ -37,7 +37,9 @@ Read the specific guideline files referenced — the index is a pointer, not the
 
 ## Step 3: Run Project Checks
 
-Run the project's lint, type-check, and test commands. Fix any failures before proceeding.
+Run the checks related to the change: lint, type-check, and existing tests that cover the touched
+code. Fix any failures before proceeding. If a check cannot run, say so; do not substitute a
+different check.
 
 ## Step 4: Review Against Checklist
 
@@ -102,9 +104,10 @@ Skip this step if your change is confined to a single layer.
 
 ## Step 6: Report and Fix
 
-Report every violation you find. Then:
+Flag only issues that affect correctness or the stated requirement. List everything else as
+optional suggestions and do not act on them. Then:
 
-- Mechanical and local (lint nit, missing type, wrong import, dead branch, failing assertion) → fix in place, then re-run project checks.
+- Mechanical and local (lint nit, missing type, wrong import, dead branch, failing assertion) → fix in place, then re-run those checks.
 - Design or judgment (naming a shared concept, moving a module boundary, changing a public interface, reassigning where behavior lives) → record the evidence and your recommendation, and stop. Do not rewrite it silently.
 
 If a fix would touch files outside the current task's scope, say so and stop instead of widening the change.

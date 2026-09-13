@@ -267,7 +267,7 @@ ${originalPrompt}
 2. **Verify task artifacts** - Check prd.md and, when present, design.md / implement.md
 3. **Spec sync** - Analyze whether changes introduce new patterns, contracts, or conventions
    - If new pattern/convention found: read target spec file → update it → update index.md if needed
-   - If infra/cross-layer change: follow the 7-section mandatory template from update-spec.md
+   - If infra/cross-layer change: write only what the code cannot express (see update-spec.md)
    - If pure code fix with no new patterns: skip this step
 4. **Run final checks** - Execute lint and typecheck
 5. **Confirm ready** - Ensure code is ready for PR
@@ -300,14 +300,14 @@ ${originalPrompt}
 ## Workflow
 
 1. **Get changes** - Run \`git diff --name-only\` and \`git diff\`
-2. **Check against specs** - Check item by item
-3. **Self-fix** - Fix issues directly, don't just report
-4. **Run verification** - Run lint and typecheck
+2. **Check against the requirement** - Go criterion by criterion through the acceptance criteria in prd.md and give evidence for each
+3. **Self-fix, or report** - Fix mechanical problems in place; report design or judgment calls and stop
+4. **Run verification** - Run the checks related to the change
 
 ## Important Constraints
 
-- Fix issues yourself, don't just report
-- Must execute complete checklist`,
+- Flag only issues that affect correctness or the stated requirement; everything else is an optional suggestion you do not act on
+- Never weaken an acceptance criterion to make it pass`,
 
     research: `<!-- trellis-hook-injected -->
 # Research Agent Task

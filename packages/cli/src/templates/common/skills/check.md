@@ -1,63 +1,43 @@
-# Code Quality Check
+# Verification
 
-Comprehensive quality verification for recently written code. Combines spec compliance, cross-layer safety, and pre-commit checks.
+Verify that the requirement was implemented correctly. Not that the code matches the spec — that the change does what was asked.
+
+Verification runs **once** per task. Repeat it only when it fails and you had to change the code.
+
+For a change made without a task, the input is the restatement the user confirmed.
 
 ---
 
-## Step 1: Identify What Changed
+## Step 1: Know what you are proving
+
+Read the acceptance criteria in `prd.md`. Each one is an observable outcome of the request.
+
+If a criterion is not observable, fix the criterion with the user before verifying against it. Never weaken a criterion to make it pass, and never invent a threshold, metric, benchmark or test count that the user did not ask for.
+
+## Step 2: List the change
 
 ```bash
 git diff --name-only HEAD
 git status
 ```
 
-## Step 2: Read Task Artifacts and Applicable Specs
+## Step 3: Evidence per criterion
 
-Read the current task artifacts in order:
+For each acceptance criterion, produce evidence:
 
-- `prd.md`
-- `design.md` if present
-- `implement.md` if present
+- a command and its output,
+- a `file:line`, or
+- a short argument, when the criterion is about a decision rather than a behavior.
 
-```bash
-python3 ./.trellis/scripts/get_context.py --mode packages
-```
+If you cannot evidence a criterion, mark it **unverified** and say so. Do not fabricate evidence, and do not substitute a proxy (a passing lint run is not evidence that a behavior works).
 
-For each changed package/layer, read the spec index and follow its **Quality Check** section:
+## Step 4: Run the checks related to the change
 
-```bash
-cat .trellis/spec/<package>/<layer>/index.md
-```
+Lint, type-check, and the existing tests that cover the code you touched. If a check cannot run in this environment, say so; do not swap in a different check and present it as the same thing.
 
-Read the specific guideline files referenced — the index is a pointer, not the goal.
+Do not add tests to reach a coverage number. Add one only when the requirement asks for it, when fixing a bug (one minimal reproduction), or when you changed behavior an existing test covers.
 
-## Step 3: Run Project Checks
-
-Run the project's lint, type-check, and test commands. Fix any failures before proceeding.
-
-## Step 4: Review Against Checklist
-
-### Code Quality
-
-- [ ] Linter passes?
-- [ ] Type checker passes (if applicable)?
-- [ ] Tests pass?
-- [ ] No debug logging left in?
-- [ ] No suppressed warnings or type-safety bypasses?
-
-### Test Coverage
-
-- [ ] New function → unit test added?
-- [ ] Bug fix → regression test added?
-- [ ] Changed behavior → existing tests updated?
-
-### Spec Sync
-
-- [ ] Does `.trellis/spec/` need updates? (new patterns, conventions, lessons learned)
-
-> "If I fixed a bug or discovered something non-obvious, should I document it so future me won't hit the same issue?" → If YES, update the relevant spec doc.
-
-### Scope Discipline
+## Step 5: Scope self-check
 
 - [ ] Any tidying of code the task did not require?
 - [ ] Any abstraction, config or extension point added for a case that does not exist yet?
@@ -65,42 +45,15 @@ Run the project's lint, type-check, and test commands. Fix any failures before p
 - [ ] Any file changed that the acceptance criteria do not mention?
 - [ ] Any workaround added at the caller instead of a fix where the behavior actually lives?
 
-## Step 5: Cross-Layer Dimensions (if applicable)
+Cross-layer or multi-package change? `guides/thinking-triggers.md` lists the triggers worth walking through — read it when the change crosses a layer or copies existing logic, not on every change.
 
-Skip this step if your change is confined to a single layer.
+## Step 6: Report, and fix only what is mechanical
 
-### A. Data Flow (changes touch 3+ layers)
+Report every finding.
 
-- [ ] Read flow traces correctly: Storage → Service → API → UI
-- [ ] Write flow traces correctly: UI → API → Service → Storage
-- [ ] Types/schemas correctly passed between layers?
-- [ ] Errors properly propagated to caller?
+- **Mechanical and local** (a lint nit, a missing type, a wrong import, a dead branch, a failing assertion) → fix it in place, then re-run the checks from Step 4.
+- **Design or judgment** (naming a shared concept, moving a module boundary, changing a public interface, deciding where behavior lives) → record the evidence and your recommendation, and stop. Do not rewrite it silently.
 
-### B. Code Reuse (modifying constants, creating utilities)
+Reviewer constraint: flag only issues that affect correctness or the stated requirement. Everything else is an optional suggestion — list it, and do not act on it.
 
-- [ ] Searched for existing similar code before creating new?
-  ```bash
-  grep -r "pattern" src/
-  ```
-- [ ] If the same value repeats, does it represent one stable concept whose callers must change together? Extract only then — two literals that merely happen to match today should stay separate.
-- [ ] After batch modification, all occurrences updated?
-
-### C. Import/Dependency (creating new files)
-
-- [ ] Correct import paths (relative vs absolute)?
-- [ ] No circular dependencies?
-
-### D. Same-Layer Consistency
-
-- [ ] Other places using the same concept are consistent?
-
----
-
-## Step 6: Report and Fix
-
-Report every violation you find. Then:
-
-- Mechanical and local (lint nit, missing type, wrong import, dead branch, failing assertion) → fix in place, then re-run project checks.
-- Design or judgment (naming a shared concept, moving a module boundary, changing a public interface, reassigning where behavior lives) → record the evidence and your recommendation, and stop. Do not rewrite it silently.
-
-If a fix would touch files outside the current task's scope, say so and stop instead of widening the change.
+If a fix would touch files outside the current task's scope, say so and stop rather than widening the change.

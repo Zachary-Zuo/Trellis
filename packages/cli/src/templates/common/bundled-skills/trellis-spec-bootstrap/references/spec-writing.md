@@ -17,11 +17,14 @@ Use short snippets only when they make the rule clearer. Prefer linking to the f
 
 Keep the spec tree aligned with the project:
 
+- Fewer files is better. Prefer merging over splitting, and delete a seed file that does not apply rather than filling it.
 - Keep `index.md` as the navigation file for the spec directory.
 - Split topics when developers would look for them independently.
 - Merge topics when separate files would repeat the same rule.
 - Delete template files that do not apply.
 - Add new files for important local patterns the template missed.
+
+Before writing any entry, run the four questions in `SKILL.md` ("Before the First Write"). If the code answers it in a minute, do not write it.
 
 ## Content Standards
 

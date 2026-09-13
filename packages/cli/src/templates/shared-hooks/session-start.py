@@ -67,39 +67,27 @@ def _normalize_windows_shell_path(path_str: str) -> str:
     return path_str
 
 
-_FIRST_REPLY_NOTICE_HEAD = """<first-reply-notice>
-On the first visible assistant reply in this session, briefly acknowledge that Trellis SessionStart context loaded."""
-
-_FIRST_REPLY_NOTICE_TAIL = """Choose the acknowledgment language in this order:
-1. Use the language of the user's current request (the user message that triggered this reply).
-2. If that request has no clear natural language, use an explicitly established project communication language.
-3. If neither provides a language, output the language-neutral fallback exactly: `Trellis SessionStart ✓`.
-Continue directly with the user's request after the acknowledgment.
-The acknowledgment must not alter the language used for the remainder of the response.
-This notice is one-shot: do not repeat it after the first visible assistant reply in this session.
+_FIRST_REPLY_NOTICE_TEMPLATE = """<first-reply-notice>
+Relay this Trellis maintenance notice on its own line in your next visible reply: {hint}
 </first-reply-notice>"""
-
-FIRST_REPLY_NOTICE = f"{_FIRST_REPLY_NOTICE_HEAD}\n{_FIRST_REPLY_NOTICE_TAIL}"
 
 
 def _build_first_reply_notice(update_hint: str | None) -> str:
-    """First-reply notice, carrying the Trellis update reminder when there is one.
+    """One-shot notice, emitted ONLY when there is something to tell the user.
 
-    The reminder has to reach the *user*, not just the model's context — a line
-    buried in SessionStart context is exactly how the update step kept getting
-    skipped. This block is already the payload's one "say it out loud" channel,
-    so the hint rides along instead of growing a second mechanism.
+    The update reminder has to reach the *user*, not just the model's context —
+    a line buried in SessionStart context is exactly how the update step kept
+    getting skipped.
 
-    With no hint the notice is byte-identical to the plain constant: no empty
-    block, no placeholder line.
+    With no hint this returns an empty string. The previous version always
+    emitted a ~780 B block whose only job was to make the model acknowledge,
+    in a language chosen by a three-rule cascade, that Trellis context had
+    loaded. That acknowledgment was ceremony: the block is a delivery channel
+    for the hint, and with no hint there is nothing to deliver.
     """
     if not update_hint:
-        return FIRST_REPLY_NOTICE
-    return (
-        f"{_FIRST_REPLY_NOTICE_HEAD}\n"
-        f"Also relay this Trellis maintenance notice on its own line in that same reply: {update_hint}\n"
-        f"{_FIRST_REPLY_NOTICE_TAIL}"
-    )
+        return ""
+    return _FIRST_REPLY_NOTICE_TEMPLATE.format(hint=update_hint)
 
 
 # Force UTF-8 on stdin/stdout/stderr on Windows. Default codepage there is

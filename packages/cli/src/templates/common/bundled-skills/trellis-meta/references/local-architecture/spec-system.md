@@ -39,7 +39,7 @@ A common monorepo structure:
     └── ...
 ```
 
-`index.md` is the entry point for each layer. It should list the Pre-Development Checklist and Quality Check. Specific guidelines live in other Markdown files in the same directory.
+`index.md` is the entry point for each layer: it holds a file table of that layer's guideline files and when to read each one. There is no Pre-Development Checklist or Quality Check section in the seed index template — the index is a map, not a checklist. Specific guidelines live in other Markdown files in the same directory.
 
 ## Package Configuration
 

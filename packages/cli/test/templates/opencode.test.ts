@@ -312,7 +312,7 @@ describe("opencode session-start history detection", () => {
     contextCollector.clear("session-a");
   });
 
-  it("builds compact startup context with an adaptive one-shot acknowledgment", () => {
+  it("builds compact startup context without a first-reply acknowledgment block", () => {
     const context = buildSessionContext({
       directory: "/tmp/trellis-opencode-test",
       getActiveTask: () => ({ taskPath: null, source: "none", stale: false }),
@@ -326,26 +326,10 @@ describe("opencode session-start history detection", () => {
 
     expect(context.startsWith("<session-context>")).toBe(true);
     expect(context).toContain("Trellis compact SessionStart context");
-    expect(context).toContain("<first-reply-notice>");
-    expect(context).toContain("the user's current request");
-    expect(context).toContain("the user message that triggered this reply");
-    expect(context).toContain("has no clear natural language");
-    expect(context).toContain(
-      "explicitly established project communication language",
-    );
-    expect(context).toContain("Trellis SessionStart ✓");
-    expect(context).toContain("Continue directly with the user's request");
-    expect(context).toContain(
-      "must not alter the language used for the remainder of the response",
-    );
-    expect(context).toContain("This notice is one-shot");
-    expect(context.indexOf("the user's current request")).toBeLessThan(
-      context.indexOf("explicitly established project communication language"),
-    );
-    expect(
-      context.indexOf("explicitly established project communication language"),
-    ).toBeLessThan(context.indexOf("Trellis SessionStart ✓"));
-    expect(context.indexOf("<first-reply-notice>")).toBeLessThan(
+    // OpenCode has no update-hint mechanism, so the payload never carries the
+    // removed <first-reply-notice> acknowledgment block.
+    expect(context).not.toContain("<first-reply-notice>");
+    expect(context.indexOf("<session-context>")).toBeLessThan(
       context.indexOf("<current-state>"),
     );
     expect(context).toContain("<guidelines>");
@@ -375,8 +359,9 @@ describe("opencode session-start history detection", () => {
       synthetic: true,
     });
     expect(firstMessages[0].parts[0].text).toMatch(/^<session-context>/);
-    expect(firstMessages[0].parts[0].text).toContain("<first-reply-notice>");
-    expect(firstMessages[0].parts[0].text).toContain("Trellis SessionStart ✓");
+    expect(firstMessages[0].parts[0].text).not.toContain(
+      "<first-reply-notice>",
+    );
     expect(firstMessages[0].parts[1]).toEqual(originalFirstParts[0]);
 
     const laterUser = userTurn("Second request", {
@@ -395,7 +380,9 @@ describe("opencode session-start history detection", () => {
     expect(laterMessages[0].parts).toBe(originalFirstParts);
     expect(originalLaterParts).toHaveLength(1);
     expect(laterMessages[2].parts[0].text).toMatch(/^<session-context>/);
-    expect(laterMessages[2].parts[0].text).not.toContain("<first-reply-notice>");
+    expect(laterMessages[2].parts[0].text).not.toContain(
+      "<first-reply-notice>",
+    );
     expect(laterMessages[2].parts[1]).toEqual(originalLaterParts[0]);
   });
 

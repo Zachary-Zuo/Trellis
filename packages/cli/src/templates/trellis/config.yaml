@@ -114,13 +114,13 @@ max_journal_lines: 2000
 # `.trellis/tasks` / `.trellis/workspace` when either is itself a top-level
 # symlink (auto-trust is on by default).
 #
-channel:
-  worker_guard:
-    idle_timeout: 5m
-    max_live_workers: 6
-  # trusted_context_dirs:
-  #   - /work/user/trellis_workspace
-  # auto_trust_trellis_symlinks: false
+# channel:
+#   worker_guard:
+#     idle_timeout: 5m
+#     max_live_workers: 6
+#   # trusted_context_dirs:
+#   #   - /work/user/trellis_workspace
+#   # auto_trust_trellis_symlinks: false
 
 #-------------------------------------------------------------------------------
 # Codex (dispatch behavior)
@@ -181,16 +181,19 @@ channel:
 # The refresh window uses wall-clock seconds. `0` disables time-based reminders;
 # SessionStart resets after /clear or /compact still force a full re-injection.
 #
-# spec_injection:
-#   enabled: true                 # false disables injection entirely
-#   max_spec_chars: 9400          # per matched spec file
-#   max_total_chars: 9500         # whole per-event payload; overflow degrades to index lines
-#   refresh_window_seconds: 2700  # touches past this interval re-emit a ticket
-#   tools:                        # tool events that trigger injection
-#     - Read
-#     - Edit
-#     - Write
-#     - MultiEdit
+spec_injection:
+  enabled: true                 # false disables injection entirely
+  max_spec_chars: 3000          # per matched spec file
+  max_total_chars: 4000         # whole per-event payload; overflow degrades to index lines
+  refresh_window_seconds: 2700  # touches past this interval re-emit a ticket
+  tools:                        # tool events that trigger injection
+    - Read
+    - Edit
+    - Write
+    - MultiEdit
+# Set `tools` to `[Edit, Write]` to stop injecting when you merely read a file.
+# That is a deliberate later step: keep Read while specs are still large, so a
+# change is still checked against the conventions it touches.
 
 #-------------------------------------------------------------------------------
 # Per-turn prompt injection

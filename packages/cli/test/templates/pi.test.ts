@@ -338,23 +338,11 @@ describe("pi templates", () => {
     expect(first.systemPrompt).toContain(
       "Trellis compact SessionStart context",
     );
-    expect(first.systemPrompt).toContain("<first-reply-notice>");
-    expect(first.systemPrompt).toContain("the user's current request");
-    expect(first.systemPrompt).toContain(
-      "the user message that triggered this reply",
-    );
-    expect(first.systemPrompt).toContain("has no clear natural language");
-    expect(first.systemPrompt).toContain(
-      "explicitly established project communication language",
-    );
-    expect(first.systemPrompt).toContain("Trellis SessionStart ✓");
-    expect(first.systemPrompt).toContain(
-      "Continue directly with the user's request",
-    );
-    expect(first.systemPrompt).toContain(
-      "must not alter the language used for the remainder of the response",
-    );
-    expect(first.systemPrompt).toContain("This notice is one-shot");
+    // Pi has no update-hint mechanism, so the startup context never carries
+    // the removed <first-reply-notice> acknowledgment block.
+    expect(first.systemPrompt).not.toContain("<first-reply-notice>");
+    expect(first.systemPrompt).not.toContain("Trellis SessionStart ✓");
+    expect(first.systemPrompt).not.toContain("This notice is one-shot");
     expect(first.systemPrompt).not.toContain("say once in Chinese");
     expect(first.systemPrompt).not.toContain(
       "exactly one short Chinese sentence",

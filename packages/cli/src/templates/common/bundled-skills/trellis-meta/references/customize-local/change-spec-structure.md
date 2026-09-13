@@ -41,9 +41,10 @@ Monorepo example:
 `index.md` should include:
 
 - What code this layer applies to.
-- Pre-Development Checklist.
-- Quality Check.
+- A file table of the guideline files in this directory and when to read each one.
 - Links to specific guideline files.
+
+The seed index has no Pre-Development Checklist or Quality Check section, and adding one is not required: the index is a map, not a checklist.
 
 ## Update Context
 

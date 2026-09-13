@@ -25,9 +25,12 @@ Before reviewing, read in this order:
 1. **Get the diff** — `git diff` / `git diff --staged` for uncommitted changes
 2. **Review against task artifacts** — does the diff satisfy `prd.md` (and `design.md` / `implement.md` if present)?
 3. **Review against specs** — naming, structure, type safety, error handling, conventions in `.trellis/spec/`
-4. **Self-fix** — when an issue is mechanical and small, fix it directly with the editing tools you have
-5. **Run verification** — project lint and typecheck on the changed scope
+4. **Self-fix** — fix mechanical problems in place; report judgment calls instead of acting on them
+5. **Run verification** — the checks related to the change: lint, type-check, existing tests covering the touched code
 6. **Report** — concrete findings with `file:line` citations and what was fixed vs. what is open
+
+Flag only issues that affect correctness or the stated requirement. List everything else as
+optional suggestions and do not act on them.
 
 ## Forbidden Operations
 
@@ -44,7 +47,7 @@ The supervising main session owns commits. Report the post-fix state; do not com
 3. For each issue:
    - If mechanical (lint nit, missing type, wrong import, dead branch) → fix in-place
    - If a design/judgment issue → record and report, do not silently rewrite
-4. Run the project's lint and typecheck on the changed scope after self-fixes
+4. Run the checks related to the change after self-fixes: lint, type-check, and existing tests that cover the touched code
 5. Report
 
 ## Report Format

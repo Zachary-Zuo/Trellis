@@ -37,14 +37,18 @@ Before checking, read:
 1. **Get code changes** - Use git diff to get uncommitted code
 2. **Review task artifacts** - Check changes against prd.md, design.md if present, and implement.md if present
 3. **Check against specs** - Verify code follows guidelines
-4. **Self-fix** - Fix issues yourself, not just report them
-5. **Run verification** - typecheck and lint
+4. **Self-fix** - Fix mechanical problems in place; report judgment calls instead of acting on them
+5. **Run verification** - the checks related to the change: lint, type-check, existing tests covering the touched code
 
 ## Important
 
-**Fix issues yourself**, don't just report them.
+**Fix mechanical problems in place. Report judgment calls; do not act on them.**
 
-You have write and edit tools, you can modify code directly.
+You have write and edit tools, you can modify code directly. If a fix would touch files outside
+the change under review, say so and stop instead of widening the change.
+
+Flag only issues that affect correctness or the stated requirement. List everything else as
+optional suggestions and do not act on them.
 
 ---
 
@@ -79,7 +83,7 @@ After finding issues:
 
 ### Step 4: Run Verification
 
-Run project's lint and typecheck commands to verify changes.
+Run the checks related to the change: lint, type-check, and existing tests that cover the touched code.
 
 If failed, fix issues and re-run.
 

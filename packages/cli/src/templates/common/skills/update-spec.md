@@ -1,351 +1,81 @@
-# Update Code-Spec - Capture Executable Contracts
+# Update Spec - Record What Code Cannot Express
 
-When you learn something valuable (from debugging, implementing, or discussion), use this to update the relevant code-spec documents.
+Specs record the current state of what the code cannot express. They are not a log of what you learned, and they never mirror the code. Use this skill after a change when one of the three write conditions below holds.
 
-**Timing**: After completing a task, fixing a bug, or discovering a new pattern
+## Write in Only Three Cases
 
----
+1. You hit a non-obvious pitfall that cost real time and would cost it again.
+2. You made a decision a future session must know — a choice whose reason is not visible in the code.
+3. A convention differs from the language or framework default.
 
-## Code-Spec First Rule (CRITICAL)
+If none of them holds, write nothing. "Nothing to write" is a normal outcome, not a failure.
 
-In this project, "spec" for implementation work means **code-spec**:
-- Executable contracts (not principle-only text)
-- Concrete signatures, payload fields, env keys, and boundary behavior
-- Testable validation/error behavior
+## Ask the Four Questions First
 
-If the change touches infra or cross-layer contracts, code-spec depth is mandatory.
+Ask these about the fact you are considering, in order. Q1 is the strongest question.
 
-### Mandatory Triggers
+| # | Question | Answer "yes" means |
+|---|---|---|
+| Q1 | Can this be read off the code in a minute? | Do not write it. At most leave one `file:line` pointer. |
+| Q2 | Would violating it cause an error no test catches, or did it come from a real incident? | Keep it as one line of rule plus the consequence of breaking it. Drop the story, dates, and issue numbers. |
+| Q3 | Is it a reason the code cannot express — a decision rationale, a rejected option, or a difference from the language / framework default? | Keep it, in at most 3 lines. |
+| Q4 | Is it an operational how-to? | Turn it into a script or a command, and leave one pointer to it. |
 
-Apply code-spec depth when the change includes any of:
-- New/changed command or API signature
-- Cross-layer request/response contract change
-- Database schema/migration change
-- Infra integration (storage, queue, cache, secrets, env wiring)
+All four answers "no": do not write the entry, and delete it if it already exists.
 
-### Mandatory Output (7 Sections)
+## Three Actions: Add, Modify, Remove
 
-For triggered tasks, include all sections below:
-1. Scope / Trigger
-2. Signatures (command/API/DB)
-3. Contracts (request/response/env)
-4. Validation & Error Matrix
-5. Good/Base/Bad Cases
-6. Tests Required (with assertion points)
-7. Wrong vs Correct (at least one pair)
+Every write names the existing entry it replaces or retires, and you then modify or remove that entry in the same pass. A spec records current state, not history: an entry that no longer holds is removed, not kept with a note that it is superseded.
 
----
+## Budget
 
-## When to Update Code-Specs
+200 lines or 12 KB per file, whichever comes first. Over budget: delete before you add. The overage never carries over to the next entry.
 
-| Trigger | Example | Target Spec |
-|---------|---------|-------------|
-| **Implemented a feature** | Added a new integration or module | Relevant spec file |
-| **Made a design decision** | Chose extensibility pattern over simplicity | Relevant spec + "Design Decisions" section |
-| **Fixed a bug** | Found a subtle issue with error handling | Relevant spec (e.g., error-handling docs) |
-| **Discovered a pattern** | Found a better way to structure code | Relevant spec file |
-| **Hit a gotcha** | Learned that X must be done before Y | Relevant spec + "Common Mistakes" section |
-| **Established a convention** | Team agreed on naming pattern | Quality guidelines |
-| **New thinking trigger** | "Don't forget to check X before doing Y" | `guides/*.md` (as a checklist item) |
+## Templates
 
-**Key Insight**: Code-spec updates are NOT just for problems. Every feature implementation contains design decisions and contracts that future AI/developers need to execute safely.
-
----
-
-## Spec Structure Overview
-
-```
-.trellis/spec/
-├── <layer>/           # Per-layer coding standards (e.g., backend/, frontend/, api/)
-│   ├── index.md       # Overview and links
-│   └── *.md           # Topic-specific guidelines
-└── guides/            # Thinking checklists (NOT coding specs!)
-    ├── index.md       # Guide index
-    └── *.md           # Topic-specific guides
-```
-
-### CRITICAL: Code-Spec vs Guide - Know the Difference
-
-| Type | Location | Purpose | Content Style |
-|------|----------|---------|---------------|
-| **Code-Spec** | `<layer>/*.md` | Tell AI "how to implement safely" | Signatures, contracts, matrices, cases, test points |
-| **Guide** | `guides/*.md` | Help AI "what to think about" | Checklists, questions, pointers to specs |
-
-**Decision Rule**: Ask yourself:
-
-- "This is **how to write** the code" → Put in a spec layer directory
-- "This is **what to consider** before writing" → Put in `guides/`
-
-**Example**:
-
-| Learning | Wrong Location | Correct Location |
-|----------|----------------|------------------|
-| "Use API X not API Y for this task" | ❌ `guides/` (too specific for a thinking guide) | ✅ Relevant spec file (concrete convention) |
-| "Remember to check X when doing Y" | ❌ Spec file (too abstract for a spec) | ✅ `guides/` (thinking checklist) |
-
-**Guides should be short checklists that point to specs**, not duplicate the detailed rules.
-
----
-
-## Update Process
-
-### Step 1: Identify What You Learned
-
-Answer these questions:
-
-1. **What did you learn?** (Be specific)
-2. **Why is it important?** (What problem does it prevent?)
-3. **Where does it belong?** (Which spec file?)
-
-### Step 2: Classify the Update Type
-
-| Type | Description | Action |
-|------|-------------|--------|
-| **Design Decision** | Why we chose approach X over Y | Add to "Design Decisions" section |
-| **Project Convention** | How we do X in this project | Add to relevant section with examples |
-| **New Pattern** | A reusable approach discovered | Add to "Patterns" section |
-| **Forbidden Pattern** | Something that causes problems | Add to "Anti-patterns" or "Don't" section |
-| **Common Mistake** | Easy-to-make error | Add to "Common Mistakes" section |
-| **Convention** | Agreed-upon standard | Add to relevant section |
-| **Gotcha** | Non-obvious behavior | Add warning callout |
-
-### Step 3: Read the Target Code-Spec
-
-Before editing, read the current code-spec to:
-- Understand existing structure
-- Avoid duplicating content
-- Find the right section for your update
-
-```bash
-cat .trellis/spec/<category>/<file>.md
-```
-
-### Step 4: Make the Update
-
-Follow these principles:
-
-1. **Be Specific**: Include concrete examples, not just abstract rules
-2. **Explain Why**: State the problem this prevents
-3. **Show Contracts**: Add signatures, payload fields, and error behavior
-4. **Show Code**: Add code snippets for key patterns
-5. **Keep it Short**: One concept per section
-
-### Step 5: Update the Index (if needed)
-
-If you added a new section or the code-spec status changed, update the category's `index.md`.
-
----
-
-## Update Templates
-
-### Mandatory Template for Infra/Cross-Layer Work
+Keep each entry this short. One concept per entry.
 
 ```markdown
-## Scenario: <name>
-
-### 1. Scope / Trigger
-- Trigger: <why this requires code-spec depth>
-
-### 2. Signatures
-- Backend command/API/DB signature(s)
-
-### 3. Contracts
-- Request fields (name, type, constraints)
-- Response fields (name, type, constraints)
-- Environment keys (required/optional)
-
-### 4. Validation & Error Matrix
-- <condition> -> <error>
-
-### 5. Good/Base/Bad Cases
-- Good: ...
-- Base: ...
-- Bad: ...
-
-### 6. Tests Required
-- Unit/Integration/E2E with assertion points
-
-### 7. Wrong vs Correct
-#### Wrong
-...
-#### Correct
-...
+### Convention: <name>
+**Do**: <the rule, one line>
+**Why**: <the reason the code cannot express>
+See `path/file.ts:42`.
 ```
-
-### Adding a Design Decision
 
 ```markdown
-### Design Decision: [Decision Name]
-
-**Context**: What problem were we solving?
-
-**Options Considered**:
-1. Option A - brief description
-2. Option B - brief description
-
-**Decision**: We chose Option X because...
-
-**Example**:
-\`\`\`typescript
-// How it's implemented
-code example
-\`\`\`
-
-**Extensibility**: How to extend this in the future...
+### Don't: <the forbidden pattern>
+**Instead**: <what to do>
+**Why**: <the failure it prevents>
 ```
-
-### Adding a Project Convention
 
 ```markdown
-### Convention: [Convention Name]
-
-**What**: Brief description of the convention.
-
-**Why**: Why we do it this way in this project.
-
-**Example**:
-\`\`\`typescript
-// How to follow this convention
-code example
-\`\`\`
-
-**Related**: Links to related conventions or specs.
+### Common Mistake: <symptom>
+**Cause**: <why it happens>
+**Fix**: <how to correct it>
 ```
-
-### Adding a New Pattern
 
 ```markdown
-### Pattern Name
-
-**Problem**: What problem does this solve?
-
-**Solution**: Brief description of the approach.
-
-**Example**:
-\`\`\`
-// Good
-code example
-
-// Bad
-code example
-\`\`\`
-
-**Why**: Explanation of why this works better.
+### Design Decision: <name>
+**Decision**: <what we do>
+**Alternatives**: <what we rejected, one line each>
+**Why**: <the reason that is not in the code>
 ```
 
-### Adding a Forbidden Pattern
+## Language
 
-```markdown
-### Don't: Pattern Name
+This skill is written in English. When you write into a project's `.trellis/spec/`, the spec BODY is Chinese, while file names, frontmatter keys, commands, paths, and code identifiers stay English. Do not translate technical terms such as task, spec, prd, design, implement, hook, index, package, layer, or slug.
 
-**Problem**:
-\`\`\`
-// Don't do this
-bad code example
-\`\`\`
+## Checks Before Finishing
 
-**Why it's bad**: Explanation of the issue.
+Five checks, in this order. The first two are subtractions; they come before the three additions of information.
 
-**Instead**:
-\`\`\`
-// Do this instead
-good code example
-\`\`\`
-```
+1. **Derivable?** Could a reader get this from the code in a minute? Then do not write it; leave a `file:line` pointer at most.
+2. **Already there?** Is there an equivalent entry in this file or a neighbouring one? Merge into it instead of adding a near-duplicate.
+3. **Replaces or retires what?** Which existing entry does this write replace or retire, and did you actually modify or remove that entry?
+4. **Over budget?** Is the file still within 200 lines / 12 KB after the write?
+5. **Evidence?** Does the entry carry a `file:line`, a command, or a concrete symbol, instead of abstract advice?
 
-### Adding a Common Mistake
+## Related
 
-```markdown
-### Common Mistake: Description
-
-**Symptom**: What goes wrong
-
-**Cause**: Why this happens
-
-**Fix**: How to correct it
-
-**Prevention**: How to avoid it in the future
-```
-
-### Adding a Gotcha
-
-```markdown
-> **Warning**: Brief description of the non-obvious behavior.
->
-> Details about when this happens and how to handle it.
-```
-
----
-
-## Interactive Mode
-
-If you're unsure what to update, answer these prompts:
-
-1. **What did you just finish?**
-   - [ ] Fixed a bug
-   - [ ] Implemented a feature
-   - [ ] Refactored code
-   - [ ] Had a discussion about approach
-
-2. **What did you learn or decide?**
-   - Design decision (why X over Y)
-   - Project convention (how we do X)
-   - Non-obvious behavior (gotcha)
-   - Better approach (pattern)
-
-3. **Would future AI/developers need to know this?**
-   - To understand how the code works → Yes, update spec
-   - To maintain or extend the feature → Yes, update spec
-   - To avoid repeating mistakes → Yes, update spec
-   - Purely one-off implementation detail → Maybe skip
-
-4. **Which area does it relate to?**
-   - [ ] Backend code
-   - [ ] Frontend code
-   - [ ] Cross-layer data flow
-   - [ ] Code organization/reuse
-   - [ ] Quality/testing
-
----
-
-## Quality Checklist
-
-Before finishing your code-spec update:
-
-- [ ] Is the content specific and actionable?
-- [ ] Did you include a code example?
-- [ ] Did you explain WHY, not just WHAT?
-- [ ] Did you include executable signatures/contracts?
-- [ ] Did you include validation and error matrix?
-- [ ] Did you include Good/Base/Bad cases?
-- [ ] Did you include required tests with assertion points?
-- [ ] Is it in the right code-spec file?
-- [ ] Does it duplicate existing content?
-- [ ] Would a new team member understand it?
-
----
-
-## Relationship to Other Commands
-
-```
-Development Flow:
-  Learn something → {{CMD_REF:update-spec}} → Knowledge captured
-       ↑                                  ↓
-  {{CMD_REF:break-loop}} ←──────────────────── Future sessions benefit
-  (deep bug analysis)
-```
-
-- `{{CMD_REF:break-loop}}` - Analyzes bugs deeply, often reveals spec updates needed
-- `{{CMD_REF:update-spec}}` - Actually makes the updates
-- `{{CMD_REF:finish-work}}` - Reminds you to check if specs need updates
-
----
-
-## Core Philosophy
-
-> **Code-specs are living documents. Every debugging session, every "aha moment" is an opportunity to make the implementation contract clearer.**
-
-The goal is **institutional memory**:
-- What one person learns, everyone benefits from
-- What AI learns in one session, persists to future sessions
-- Mistakes become documented guardrails
+- `trellis-break-loop` - deep analysis of a bug fixed more than once; a common source of a Q2 entry.
+- `{{CMD_REF:finish-work}}` - end-of-session wrap-up; the spec note itself is optional (`workflow.md` Phase 3.3).

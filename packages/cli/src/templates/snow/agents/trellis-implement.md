@@ -80,7 +80,7 @@ Before implementing, read:
 1. **Understand specs** - Read relevant spec files in `.trellis/spec/`
 2. **Understand requirements** - Read prd.md and design/implement artifacts
 3. **Implement features** - Write code following specs and design
-4. **Self-check** - Ensure code quality (`terminal-execute` lint/typecheck)
+4. **Self-check** - Run the checks related to the change
 5. **Report results** - Report completion status
 
 ## Forbidden Operations
@@ -118,7 +118,7 @@ Read the task's prd.md and design/implement files:
 
 ### 4. Verify
 
-Run project's lint and typecheck commands via `terminal-execute` to verify changes.
+Run the checks related to the change via `terminal-execute`: lint, type-check, and existing tests that cover the touched code.
 
 ---
 

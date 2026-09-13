@@ -209,6 +209,8 @@ describe("regression: branch context in session records (issue-106)", () => {
   });
 
   it("[issue-106] workspace-index.md template documents Branch field only for session records", () => {
+    // Session record field descriptions stay a fixed English enumeration inside
+    // the Chinese template (drafts/workflow-lite-plan.md §0.4).
     expect(workspaceIndexContent).toContain(
       "Branch: Which branch the work was done on",
     );
@@ -4955,30 +4957,16 @@ print(json.dumps({
   function firstReplyNotice(context: string): string {
     const closingTag = "</first-reply-notice>";
     const start = context.indexOf("<first-reply-notice>");
+    if (start < 0) return "";
     const end = context.indexOf(closingTag);
-    expect(start, "payload should carry a first-reply notice").toBeGreaterThan(
-      -1,
-    );
     expect(end).toBeGreaterThan(start);
     return context.slice(start, end + closingTag.length);
   }
 
-  // The notice exactly as it shipped before the update reminder existed. A
-  // project that is up to date must still emit these bytes and nothing else —
-  // no empty block, no placeholder line. Comparing two runs of the same build
-  // cannot catch a line that is added unconditionally, so this is pinned.
-  const NOTICE_WITHOUT_UPDATE_HINT = [
-    "<first-reply-notice>",
-    "On the first visible assistant reply in this session, briefly acknowledge that Trellis SessionStart context loaded.",
-    "Choose the acknowledgment language in this order:",
-    "1. Use the language of the user's current request (the user message that triggered this reply).",
-    "2. If that request has no clear natural language, use an explicitly established project communication language.",
-    "3. If neither provides a language, output the language-neutral fallback exactly: `Trellis SessionStart ✓`.",
-    "Continue directly with the user's request after the acknowledgment.",
-    "The acknowledgment must not alter the language used for the remainder of the response.",
-    "This notice is one-shot: do not repeat it after the first visible assistant reply in this session.",
-    "</first-reply-notice>",
-  ].join("\n");
+  // The notice is a delivery channel for the update reminder, not an
+  // acknowledgment ritual: with no hint to relay it must not be emitted at all.
+  // (Before the lite rewrite it always shipped ~780 B of language-selection
+  // instructions; see drafts/workflow-lite-plan.md 3.2.)
 
   function updateMarkerPath(sessionId: string): string {
     return path.join(
@@ -5005,7 +4993,7 @@ print(json.dumps({
         "Trellis update available: 0.5.0 -> 0.5.9, run trellis update",
       );
       expect(firstReplyNotice(context)).toContain(
-        "on its own line in that same reply",
+        "on its own line in your next visible reply",
       );
       expect(trellisCliCallCount()).toBe(1);
     },
@@ -5018,15 +5006,16 @@ print(json.dumps({
       writeClaudeSessionStartHook();
       const fakeCli = writeFakeTrellisCli(REPORTS_0_5_9);
 
-      // No .trellis/.version: the hint path cannot produce anything, so this
-      // is the payload exactly as it was shipped before the change.
+      // No .trellis/.version: the hint path cannot produce anything, so no
+      // notice block should be emitted at all.
       const baseline = sessionStartContext("update-baseline", fakeCli);
 
       writeProjectFile(path.join(".trellis", ".version"), "0.6.0\n");
       const upToDate = sessionStartContext("update-current", fakeCli);
 
       expect(baseline).not.toContain("Trellis update available");
-      expect(firstReplyNotice(upToDate)).toBe(NOTICE_WITHOUT_UPDATE_HINT);
+      expect(baseline).not.toContain("<first-reply-notice>");
+      expect(upToDate).not.toContain("<first-reply-notice>");
       expect(upToDate).toBe(baseline);
     },
   );
@@ -5074,7 +5063,7 @@ print(json.dumps({
 
       for (const context of [afterFailure, afterTimeout]) {
         expect(context).not.toContain("Trellis update available");
-        expect(context).toContain("<first-reply-notice>");
+        expect(context).not.toContain("<first-reply-notice>");
         expect(context).toContain("<task-status>");
       }
       // A probe that never produced an answer must not burn the marker.
@@ -5094,7 +5083,7 @@ print(json.dumps({
     const context = sessionStartContext("update-unreadable");
 
     expect(context).not.toContain("Trellis update available");
-    expect(context).toContain("<first-reply-notice>");
+    expect(context).not.toContain("<first-reply-notice>");
     expect(context).toContain("<task-status>");
   });
 
@@ -6187,28 +6176,11 @@ print(json.dumps({
       const ctx = payload.hookSpecificOutput.additionalContext;
       expect(ctx.startsWith("<session-context>")).toBe(true);
       expect(ctx).toContain("Trellis compact SessionStart context");
-      expect(ctx).toContain("<first-reply-notice>");
-      expect(ctx).toContain("the user's current request");
-      expect(ctx).toContain("the user message that triggered this reply");
-      expect(ctx).toContain("has no clear natural language");
-      expect(ctx).toContain(
-        "explicitly established project communication language",
-      );
-      expect(ctx).toContain("Trellis SessionStart ✓");
-      expect(ctx).toContain("Continue directly with the user's request");
-      expect(ctx).toContain(
-        "must not alter the language used for the remainder of the response",
-      );
-      expect(ctx).toContain("This notice is one-shot");
-      expect(ctx.indexOf("the user's current request")).toBeLessThan(
-        ctx.indexOf("explicitly established project communication language"),
-      );
-      expect(
-        ctx.indexOf("explicitly established project communication language"),
-      ).toBeLessThan(ctx.indexOf("Trellis SessionStart ✓"));
-      expect(ctx.indexOf("<first-reply-notice>")).toBeLessThan(
-        ctx.indexOf("<current-state>"),
-      );
+      // No update hint in this fixture, so the acknowledgment notice must be
+      // absent entirely (it used to ship ~780 B of language rules).
+      expect(ctx).not.toContain("<first-reply-notice>");
+      expect(ctx).not.toContain("Trellis SessionStart ✓");
+      expect(ctx).not.toContain("This notice is one-shot");
       expect(ctx).toContain("<current-state>");
       expect(ctx).toContain("<trellis-workflow>");
       expect(ctx).toContain("<guidelines>");
@@ -7773,9 +7745,8 @@ print(len(entries))
     expect(wf).toContain("#### 1.3 Context manifests `[optional · once]`");
     expect(wf).toContain("--allow-empty-context");
 
-    // The brainstorm skill and its copilot prompt still carry the pre-reversal
-    // wording; they are updated together with the rest of the skill text in a
-    // later slice. Pinned here so the two sides cannot drift silently.
+    // The skill side is reversed too: the old ready gate must not survive
+    // anywhere the templates ship, and the skill must state the new rule.
     const templateRoot = path.join(
       path.dirname(fileURLToPath(import.meta.url)),
       "..",
@@ -7792,13 +7763,26 @@ print(len(entries))
         path.join(templateRoot, relativePath),
         "utf-8",
       );
-      expect(content, relativePath).toContain(
-        "Sub-agent-dispatch tasks have real curated entries in both `implement.jsonl` and `check.jsonl`; seed-only manifests are not ready.",
+      expect(content, relativePath).not.toContain(
+        "seed-only manifests are not ready",
+      );
+      expect(content, relativePath).not.toContain(
+        "must each contain at least one real spec/research entry",
       );
     }
+    expect(
+      fs.readFileSync(
+        path.join(templateRoot, "common/skills/brainstorm.md"),
+        "utf-8",
+      ),
+    ).toContain("are optional manifests that hand a sub-agent");
   });
 
-  it("[#320] brainstorm templates require lossless PRD convergence before start", () => {
+  it("[#320-reversed] brainstorm no longer mandates a lossless PRD convergence pass", () => {
+    // Reversal of #320 (drafts/workflow-lite-plan.md §3.3.1): the mechanical
+    // "rewrite prd.md once, losslessly" step produced output nearly identical
+    // to its input while costing a full pass per task. The convergence GATE and
+    // the final-approval gate both survive; only the rewrite ritual is gone.
     const templateRoot = path.join(
       path.dirname(fileURLToPath(import.meta.url)),
       "..",
@@ -7815,19 +7799,12 @@ print(len(entries))
         path.join(templateRoot, relativePath),
         "utf-8",
       );
-      expect(content, relativePath).toContain(
+      expect(content, relativePath).not.toContain("PRD Convergence Pass");
+      expect(content, relativePath).not.toContain(
         "Run the requirement convergence gate, then the PRD convergence pass.",
       );
-      expect(content, relativePath).toContain("## PRD Convergence Pass");
-      expect(content, relativePath).toContain(
-        "Fold temporary brainstorm sections such as `What I already know`, `Assumptions`, and resolved `Open Questions`",
-      );
-      expect(content, relativePath).toContain(
-        "Preserve every file:line anchor, decision, constraint, requirement ID, and acceptance-criteria mapping.",
-      );
-      expect(content, relativePath).toContain(
-        "no unresolved temporary brainstorm sections, no duplicate facts across sections",
-      );
+      expect(content, relativePath).toContain("Requirement Convergence Gate");
+      expect(content, relativePath).toContain("final planning summary");
     }
   });
 

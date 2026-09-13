@@ -80,7 +80,7 @@ Read the task's prd.md and design/implement files:
 
 ### 4. Verify
 
-Run project's lint and typecheck commands to verify changes.
+Run the checks related to the change: lint, type-check, and existing tests that cover the touched code.
 
 ---
 

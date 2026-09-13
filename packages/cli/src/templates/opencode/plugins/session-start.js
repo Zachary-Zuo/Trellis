@@ -13,15 +13,8 @@ import {
   MESSAGES_TRANSFORM_HOOK,
   platformInputFromMessages,
   prependEphemeralText,
-  transcriptHasAssistantMessage,
 } from "../lib/context-visibility.js"
 import { buildSessionContext } from "../lib/session-utils.js"
-
-const FIRST_REPLY_NOTICE_RE = /<first-reply-notice>[\s\S]*?<\/first-reply-notice>\s*/g
-
-function stripFirstReplyNotice(context) {
-  return context.replace(FIRST_REPLY_NOTICE_RE, "")
-}
 
 // OpenCode 1.2.x expects plugins to be factory functions (see inject-subagent-context.js comment).
 export default async ({ directory }) => {
@@ -51,10 +44,7 @@ export default async ({ directory }) => {
           return
         }
 
-        let context = buildSessionContext(ctx, platformInput)
-        if (transcriptHasAssistantMessage(messages)) {
-          context = stripFirstReplyNotice(context)
-        }
+        const context = buildSessionContext(ctx, platformInput)
         debugLog("session", "Built context, length:", context.length)
         prependEphemeralText(messages, context)
       } catch (error) {

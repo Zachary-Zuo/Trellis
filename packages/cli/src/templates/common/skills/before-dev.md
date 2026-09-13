@@ -21,14 +21,11 @@ Execute these steps:
    ```bash
    cat .trellis/spec/<package>/<layer>/index.md
    ```
-   Follow the **"Pre-Development Checklist"** section in the index.
+   Read the index's file table and pick the entries relevant to this change.
 
-5. **Read the specific guideline files** listed in the Pre-Development Checklist that are relevant to your task. The index is NOT the goal — it points you to the actual guideline files (e.g., `error-handling.md`, `conventions.md`, `mock-strategies.md`). Read those files to understand the coding standards and patterns.
+5. **Read the guideline files you picked.** The index is NOT the goal — it points you to the actual guideline files (e.g., `error-handling.md`, `conventions.md`, `mock-strategies.md`). Read those files to understand the coding standards and patterns.
 
-6. **Always read shared guides**:
-   ```bash
-   cat .trellis/spec/guides/index.md
-   ```
+   When the change crosses a layer, or reuses or copies existing logic, also read `guides/thinking-triggers.md`.
 
 7. **For a non-trivial task, state the change boundary before writing code.** Non-trivial means it touches more than one file, crosses a layer, changes a public interface, or edits code you did not just write. Write down:
    - the smallest behavior gap between what happens now and what should happen
@@ -42,5 +39,3 @@ Execute these steps:
    If the real scope turns out to be clearly larger than this, say so and why before continuing. Do not widen the change on your own.
 
 8. Understand the coding standards and patterns you need to follow, then proceed with your development plan.
-
-This step is **mandatory** before writing any code.

@@ -17,7 +17,7 @@ When the user wants to change Trellis phases, next-action hints, whether to crea
 | Change the next step during planning | Phase 1 and `[workflow-state:planning]`. |
 | Change whether an agent is required during in_progress | Phase 2 and `[workflow-state:in_progress]`. |
 | Change wrap-up after completion | Phase 3 and `[workflow-state:completed]`. |
-| Change which skill a user intent triggers | `Skill Routing` table. |
+| Change which skill a user intent triggers | `Active Task Routing` table. |
 
 ## Modification Steps
 

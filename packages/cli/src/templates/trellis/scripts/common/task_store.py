@@ -322,6 +322,7 @@ def _default_prd_content(title: str, description: str | None = None) -> str:
 
 ## 验收标准
 
+<!-- 需求的可观察结果。不自造阈值、指标或基准；需要数字时由用户给出。 -->
 - [ ] 待补充。
 
 ## 未决问题
@@ -332,7 +333,6 @@ def _default_prd_content(title: str, description: str | None = None) -> str:
 
 - Trellis task 的 title、slug 和目录名使用英文；本文件正文使用中文。
 - `prd.md` 只写目标、背景、需求、约束、验收标准和未决问题，不写技术实现清单。
-- 轻量任务可以只保留 PRD；复杂任务在 `task.py start` 前必须补 `design.md` 和 `implement.md`。
 """
 
 
@@ -728,12 +728,14 @@ def cmd_create(args: argparse.Namespace) -> int:
     print(colored("Next steps:", Colors.BLUE), file=sys.stderr)
     print("  - Use an English title/slug/path; write task artifact bodies in Chinese", file=sys.stderr)
     print("  - 在 prd.md 中补齐需求、约束和验收标准", file=sys.stderr)
-    print("  - 轻量任务可以只保留 PRD", file=sys.stderr)
-    print("  - 复杂任务在 task.py start 前补 design.md 和 implement.md", file=sys.stderr)
+    print(
+        "  - 任务档三件套齐全：prd.md、design.md、implement.md 都要在 task.py start 前就绪",
+        file=sys.stderr,
+    )
     if created_jsonl:
         print(
-            "  - 子代理需要上下文时，在 task.py start 前整理 implement.jsonl / check.jsonl "
-            "（创建时为空）的 spec/research 清单：",
+            "  - 可选：Phase 2 要派 implement/check 子代理时，再整理 implement.jsonl / check.jsonl 的 spec/research 清单"
+            "（主会话实现不需要它们）",
             file=sys.stderr,
         )
         print(

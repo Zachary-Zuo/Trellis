@@ -41,7 +41,7 @@ The user resumed work after a gap and the context is implicit.
 - "我们上次做到哪了"
 - "接着昨天那个任务"
 
-Reach: `trellis mem list --task <current-task-dir>` to find the most recent sessions tied to the active task, then `extract` the last one.
+Reach: `trellis mem list --cwd <project-path>` to find the most recent sessions for this project, then `extract` the last one. Narrow with `--grep` on `extract` when you know a keyword.
 
 ## Familiar-bug debugging
 
@@ -80,7 +80,7 @@ The user explicitly wants to look back at this task — not as a forced step, on
 - "记一下这次踩的坑"
 - "复盘下这个任务"
 
-Reach: identify the current task's session id (from `.trellis/.runtime/sessions/*.json` or `mem list --task <task-dir>`), then `extract <id> --phase brainstorm` and `--phase implement`. Present a summary — surface concrete file:line citations where possible. Whether to also write the summary somewhere (PRD, spec, notes file) is the user's call; offer, don't auto-write.
+Reach: identify the current task's session id (from `.trellis/.runtime/sessions/*.json`, or `mem list --cwd <project-path>` and take the most recent), then `extract <id> --phase brainstorm` and `--phase implement`. Present a summary — surface concrete file:line citations where possible. Whether to also write the summary somewhere (PRD, spec, notes file) is the user's call; offer, don't auto-write.
 
 ## Anti-patterns: do NOT reach for `mem` here
 

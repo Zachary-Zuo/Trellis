@@ -673,7 +673,7 @@ All the information you need has been prepared for you:
 1. **Understand specs** - All dev specs are injected above, understand them
     2. **Understand task artifacts** - Read requirements, technical design if present, and execution plan if present
     3. **Implement feature** - Implement following specs and task artifacts
-4. **Self-check** - Ensure code quality against check specs
+4. **Self-check** - Verify against the prd.md acceptance criteria
 
 ## Important Constraints
 
@@ -706,14 +706,14 @@ All check specs and dev specs you need:
 ## Workflow
 
 1. **Get changes** - Run `git diff --name-only` and `git diff` to get code changes
-2. **Check against specs** - Check item by item against specs above
-3. **Self-fix** - Fix issues directly, don't just report
-4. **Run verification** - Run project's lint and typecheck commands
+2. **Check against the requirement** - Go criterion by criterion through the acceptance criteria in prd.md and give evidence for each
+3. **Self-fix, or report** - Fix mechanical problems in place (lint nits, wrong imports, dead branches, failing assertions); report design or judgment calls and stop
+4. **Run verification** - Run the checks related to the change
 
 ## Important Constraints
 
-- Fix issues yourself, don't just report
-- Must execute complete checklist in check specs
+- Flag only issues that affect correctness or the stated requirement; everything else is an optional suggestion you do not act on
+- Never weaken an acceptance criterion to make it pass, and never invent a threshold, metric or test count the user did not ask for
 - Pay special attention to impact radius analysis (L1-L5)"""
 
 

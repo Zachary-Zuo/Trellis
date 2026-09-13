@@ -57,7 +57,7 @@ If the content is a coding convention, write it to spec. Examples:
 ```text
 .trellis/spec/backend/error-handling.md
 .trellis/spec/frontend/components.md
-.trellis/spec/guides/cross-platform-thinking-guide.md
+.trellis/spec/guides/thinking-triggers.md
 ```
 
 After writing it, update the corresponding `index.md` so AI can find the new rule from the entry point.
