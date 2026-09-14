@@ -30,6 +30,12 @@ In dsh:
 3. Finish through `trellis-finish-work`, which preserves the required order:
    commit, archive, then journal.
 
+Everything above works with no configuration. To additionally get the automatic
+per-turn workflow breadcrumb, SessionStart context, and path-scoped spec
+injection, mount the hook bridge once — see [Hooks: mount the bridge
+once](#hooks-mount-the-bridge-once) below. That step is manual by necessity: it
+edits a machine-level DSH profile, not anything inside this project.
+
 ## Companion plugin fallback contract
 
 The Trellis adapter does not install a DSH profile plugin. Before dispatching a

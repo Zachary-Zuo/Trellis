@@ -28,8 +28,11 @@ Common files:
 | Factory Droid | `.factory/settings.json` |
 | Pi Agent | `.pi/settings.json`, `.pi/extensions/trellis/` |
 | Trae IDE | `.trae/hooks.json` |
+| DeepSeek Harness | `.dsh/hooks.json` |
 
-Reasonix is a pull-based platform whose agent files contain prelude instructions to read context after startup. ZCode uses `.zcode/config.json` with shared hooks, including PreToolUse for sub-agent prompt injection. Kimi Code is likewise pull-based and has no project-level settings/hooks file Trellis writes (hooks live only in the user-level `~/.kimi-code/config.toml`), so its agent prompts ship as skills with the same prelude. DeepSeek Harness also has no project-level hook/settings surface Trellis writes; the optional `dsh-trellis` profile plugin supplies per-turn breadcrumbs and event-driven `trellis_wait`, while DSH role skills pull task context in both plugin and no-plugin paths.
+Reasonix is a pull-based platform whose agent files contain prelude instructions to read context after startup. ZCode uses `.zcode/config.json` with shared hooks, including PreToolUse for sub-agent prompt injection. Kimi Code is likewise pull-based and has no project-level settings/hooks file Trellis writes (hooks live only in the user-level `~/.kimi-code/config.toml`), so its agent prompts ship as skills with the same prelude.
+
+DeepSeek Harness has no hook system of its own, so `.dsh/hooks.json` is not a native hook surface: it is a Claude Code dialect config that the `@deepseek-ai/dsh-hooks-claude-code` bridge reads. Trellis writes the config and the scripts under `.dsh/hooks/`, but the bridge must be mounted once by the operator in `$DSH_HOME/cordis.patch.yml` — a machine-level file outside any project — so the project files are inert until that mount exists. Unlike every other row above, this one cannot be made to work by editing files inside the project. The optional `dsh-trellis` profile plugin separately supplies per-turn breadcrumbs and event-driven `trellis_wait`, and DSH role skills pull task context in both plugin and no-plugin paths. `.dsh/DSH.md` carries the mount snippet and the platform's constraints.
 
 Whether these files exist in a project depends on which `trellis init --<platform>` flags the user ran.
 

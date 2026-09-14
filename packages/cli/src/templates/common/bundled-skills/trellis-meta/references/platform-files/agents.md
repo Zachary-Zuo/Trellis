@@ -35,7 +35,8 @@ Agent files should not become generic chat prompts. They should define input sou
 | Reasonix | `.reasonix/skills/trellis-*/SKILL.md` (subagent frontmatter) |
 | ZCode | `.zcode/agents/trellis-*.md` |
 | Kimi Code | `.kimi-code/skills/trellis-*/SKILL.md` (agent prompts as skills, dispatched to the built-in `coder`; research needs its file-editing tools to persist findings) |
-| DeepSeek Harness | `.dsh/skills/trellis-agent-*/SKILL.md` (role prompts as child-only skills; optional `trellis_wait` enables continuable background settlement; without it, dispatch every child with `run_in_background: false` from the outset) |
+| DeepSeek Harness | `.dsh/skills/trellis-agent-*/SKILL.md` (role prompts as child-only skills; optional `trellis_wait` enables continuable background settlement; without it, dispatch every child with `run_in_background: false` from the outset). Sub-agent context arrives automatically only once `.dsh/hooks.json` is mounted through the `dsh-hooks-claude-code` bridge — see `.dsh/DSH.md`. |
+| DeepSeek Harness (hook push) | `.dsh/hooks.json` + `.dsh/hooks/` — written by Trellis, but **inert until the operator mounts the bridge** in `$DSH_HOME/cordis.patch.yml`. With it mounted, DSH behaves like a hook-push platform (SessionStart context, per-turn breadcrumb, spec injection); without it, treat DSH as agent pull. |
 
 GitHub Copilot agent/prompt support is provided by a combination of directories such as `.github/agents/`, `.github/prompts/`, and `.github/skills/`; inspect the files actually generated in the user project.
 
@@ -61,6 +62,12 @@ The agent file instructs the agent to read after startup:
 - `implement.md` if present
 
 This mode fits platforms whose hooks cannot reliably rewrite sub-agent prompts.
+
+DeepSeek Harness is the one platform that changes mode: it is agent pull by
+default, and hook push once the `dsh-hooks-claude-code` bridge is mounted. Keep
+the pull instructions in the DSH role skills either way — the bridge is optional
+and a missing mount is silent (the bridge logs a warning and runs no hooks), so
+pull is the only mode that always works.
 
 ## Local Change Scenarios
 
