@@ -181,20 +181,26 @@ max_journal_lines: 2000
 # The refresh window uses wall-clock seconds. `0` disables time-based reminders;
 # SessionStart resets after /clear or /compact still force a full re-injection.
 #
-spec_injection:
-  enabled: true                 # false disables injection entirely
-  max_spec_chars: 3000          # per matched spec file
-  max_total_chars: 4000         # whole per-event payload; overflow degrades to index lines
-  refresh_window_seconds: 2700  # touches past this interval re-emit a ticket
-  tools:                        # tool events that trigger injection
-    - Read
-    - Edit
-    - Write
-    - MultiEdit
+# spec_injection:
+#   enabled: true                 # false disables injection entirely
+#   max_spec_chars: 9400          # per matched spec file
+#   max_total_chars: 9500         # whole per-event payload; overflow degrades to index lines
+#   refresh_window_seconds: 2700  # touches past this interval re-emit a ticket
+#   tools:                        # tool events that trigger injection (host-specific)
+#     - Read
+#     - Edit
+#     - Write
+#     - MultiEdit
+# The block above ships inert, like every other optional section in this file.
+# `tools` names the events THIS platform's hook receives, and one config ships to
+# every platform: Claude Code and Codex spell them Read/Edit/Write/MultiEdit, while
+# DSH forwards its own lowercase read/write/edit. The shared hook's built-in default
+# already covers every registered platform, so leave this key out unless you are
+# NARROWING the trigger set — and then spell the names the platform you actually run
+# delivers, or spec injection goes silently inert.
 # Set `tools` to `[Edit, Write]` to stop injecting when you merely read a file.
 # That is a deliberate later step: keep Read while specs are still large, so a
 # change is still checked against the conventions it touches.
-
 #-------------------------------------------------------------------------------
 # Per-turn prompt injection
 #-------------------------------------------------------------------------------

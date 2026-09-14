@@ -461,3 +461,36 @@ describe("configYamlTemplate: context_injection section", () => {
     }
   });
 });
+
+// =============================================================================
+// config.yaml — spec_injection section
+// =============================================================================
+
+describe("configYamlTemplate: spec_injection section", () => {
+  it("ships the spec_injection block fully commented out", () => {
+    const lines = configYamlTemplate.split("\n");
+    const start = lines.findIndex((l) => l.includes("spec_injection:"));
+    expect(start).toBeGreaterThan(-1);
+
+    // The entire key block — keys and list items, not just the header — must be
+    // commented: an ACTIVE block is a hard override, so shipping one silently
+    // replaces the shared hook's per-host defaults. That is exactly how spec
+    // injection went inert on DSH (a Claude-spelled `tools:` list became the
+    // effective filter for a host whose tools are named read/write/edit).
+    const block: string[] = [];
+    for (let i = start; i < lines.length; i += 1) {
+      const stripped = lines[i].replace(/^#\s?/, "");
+      if (i > start && stripped.trim() && !/^\s/.test(stripped)) break;
+      block.push(lines[i]);
+    }
+    expect(block.length).toBeGreaterThan(1);
+    for (const line of block) {
+      expect(line.trimStart().startsWith("#")).toBe(true);
+    }
+  });
+
+  it("documents the shipped defaults that apply when the block stays inert", () => {
+    expect(configYamlTemplate).toContain("#   max_spec_chars: 9400");
+    expect(configYamlTemplate).toContain("#   max_total_chars: 9500");
+  });
+});

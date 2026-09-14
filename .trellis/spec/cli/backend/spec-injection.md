@@ -592,20 +592,23 @@ sanitized — is unforgeable.
 ## 6. Config keys (`.trellis/config.yaml`)
 
 ```yaml
-spec_injection:
-  enabled: true # false disables push injection entirely
-  max_spec_chars: 9400 # per matched spec file; 0 = unlimited
-  max_total_chars: 9500 # whole per-event payload; 0 = unlimited
-  refresh_window_seconds: 2700 # fixed wall-clock window; 0 = never refresh
-  tools: # tool events that trigger injection
-    - Read
-    - Edit
-    - Write
-    - MultiEdit
+# spec_injection:
+#   enabled: true # false disables push injection entirely
+#   max_spec_chars: 9400 # per matched spec file; 0 = unlimited
+#   max_total_chars: 9500 # whole per-event payload; 0 = unlimited
+#   refresh_window_seconds: 2700 # fixed wall-clock window; 0 = never refresh
+#   tools: # tool events that trigger injection (host-specific)
+#     - Read
+#     - Edit
+#     - Write
+#     - MultiEdit
 ```
 
-- Section absent (default install — the template ships it commented out) ⇒
-  defaults above.
+- Section absent (default install — the template ships it **fully commented
+  out**, `trellis.test.ts` pins that) ⇒ the hook's own defaults apply. An
+  ACTIVE block is a hard override that replaces those defaults, which is why
+  shipping one is a defect and not a convenience: the keys are not all
+  host-neutral.
 - `enabled` accepts booleans and the strings `true/yes/1/on` /
   `false/no/0/off`; anything else → stderr warn, default `true`.
 - Non-integer or negative character/window values → stderr warn, default for
@@ -613,13 +616,21 @@ spec_injection:
 - `refresh_window_seconds` sizes the fixed wall-clock refresh window (§4).
   `0` disables time-based reminders; clear/compact reset events still force
   FULL.
-- `tools` filters which logical tool events trigger the hook. Codex
-  `apply_patch` maps to `Edit`; this avoids exposing a Codex-only config name.
-  Both grammars are accepted: a block list (`- Edit` items)
-  and a flow sequence (`tools: [Edit, Write]`). An **empty list (`[]`, either
-  grammar) is a deliberate "never trigger"** and is respected — early exit;
-  unknown tool names warn once to stderr (they can never match); any other
-  value shape warns and falls back to the default four.
+- `tools` filters which logical tool events trigger the hook, and is the ONE
+  host-specific key in this section — so it is the one key never worth setting
+  by default. Names must be the spellings the running platform actually
+  delivers: Claude Code and Codex use `Read`/`Edit`/`Write`/`MultiEdit`, DSH
+  forwards its own lowercase `read`/`write`/`edit` (§8). The shared hook's
+  `DEFAULT_EDIT_TOOLS` therefore covers both spellings, and a config list
+  **replaces** it, so an explicit list written for one host silently disables
+  injection on another. Codex `apply_patch` maps to `Edit`; this avoids
+  exposing a Codex-only config name. Both grammars are accepted: a block list
+  (`- Edit` items) and a flow sequence (`tools: [Edit, Write]`). An **empty
+  list (`[]`, either grammar) is a deliberate "never trigger"** and is
+  respected — early exit; unknown tool names warn once to stderr (they can
+  never match; the known set is `DEFAULT_EDIT_TOOLS` plus `apply_patch` /
+  `glob` / `grep`, which are routable but off by default); any other value
+  shape warns and falls back to the default set.
 - `enabled: false` disables the hook only; pull mode is unaffected.
 - There is deliberately **no path mapping in config.yaml** — frontmatter is
   the single source of truth (two sources would drift).

@@ -42,9 +42,33 @@ const HOOK_PATH = path.resolve(
   "../../src/templates/shared-hooks/inject-spec-context.py",
 );
 
+/**
+ * Interpreter for the hook under test.
+ *
+ * These tests spawn a real Python process, and the interpreter is not always
+ * named `python3`: Windows ships `python.exe` (and a Microsoft Store `python3`
+ * stub that is not a real interpreter), and a conda/venv install often exposes
+ * only `python`. Hard-coding `python3` made the whole suite silently `skipIf`
+ * away on those hosts — a green run meant "never executed", not "passed".
+ * Set `TRELLIS_TEST_PYTHON` to point at a specific interpreter.
+ */
+const PYTHON = process.env.TRELLIS_TEST_PYTHON?.trim() || "python3";
+
+/**
+ * Normalize subprocess output to LF.
+ *
+ * Windows Python writes CRLF to a pipe, so every `stdout.trim().split("\n")`
+ * leaves a trailing `\r` on each element and string comparisons fail on the
+ * line ending rather than on the behavior under test. These tests only ran on
+ * hosts whose `python3` exists and writes LF, so the brittleness stayed hidden.
+ */
+function normalizeEol(text: string): string {
+  return text.replace(/\r\n/g, "\n");
+}
+
 function hasPython(): boolean {
   try {
-    execFileSync("python3", ["--version"], { stdio: "ignore" });
+    execFileSync(PYTHON, ["--version"], { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -144,8 +168,8 @@ REPO_ROOT = Path(${JSON.stringify(tmp)})
 ${code}
 `;
   fs.writeFileSync(probePath, script, "utf-8");
-  const r = spawnSync("python3", [probePath], { cwd: tmp, encoding: "utf-8" });
-  return { status: r.status, stdout: r.stdout, stderr: r.stderr };
+  const r = spawnSync(PYTHON, [probePath], { cwd: tmp, encoding: "utf-8" });
+  return { status: r.status, stdout: normalizeEol(r.stdout), stderr: r.stderr };
 }
 
 /** R7: import the pure decision module directly (sibling of runSpecProbe).
@@ -184,8 +208,8 @@ REPO_ROOT = Path(${JSON.stringify(tmp)})
 ${code}
 `;
   fs.writeFileSync(probePath, script, "utf-8");
-  const r = spawnSync("python3", [probePath], { cwd: tmp, encoding: "utf-8" });
-  return { status: r.status, stdout: r.stdout, stderr: r.stderr };
+  const r = spawnSync(PYTHON, [probePath], { cwd: tmp, encoding: "utf-8" });
+  return { status: r.status, stdout: normalizeEol(r.stdout), stderr: r.stderr };
 }
 
 /** Evaluate glob→path pairs through glob_to_regex; returns "1"/"0" per pair. */
@@ -239,13 +263,18 @@ function runHook(
   // Claude Code session), so strip every identity-bearing key for hermetic
   // no-identity cases; tests opt back in via extraEnv.
   delete env.TRELLIS_CONTEXT_ID;
+  // `_SESSION_?ID` alone missed the context-key overrides the shared resolver
+  // also honors: running these tests from inside a Trellis session exports
+  // DSH_TRELLIS_CONTEXT_ID / TRELLIS_CONTEXT_ID, which the hook picks up as a
+  // real identity — so the "no identity" case silently became stateful. Strip
+  // every context/session override a host is known to set.
   const identityBearing =
-    /(_SESSION_?ID|_CONVERSATION_?ID|_TRANSCRIPT_PATH|_THREAD_ID|_RUN_ID)$/i;
+    /(_SESSION_?ID|_CONVERSATION_?ID|_TRANSCRIPT_PATH|_THREAD_ID|_RUN_ID|_CONTEXT_ID)$/i;
   const cleanEnv = Object.fromEntries(
     Object.entries(env).filter(([key]) => !identityBearing.test(key)),
   );
   Object.assign(cleanEnv, extraEnv);
-  const r = spawnSync("python3", [HOOK_PATH], {
+  const r = spawnSync(PYTHON, [HOOK_PATH], {
     cwd: tmp,
     encoding: "utf-8",
     input,
@@ -346,11 +375,11 @@ function runGetContext(
   args: string[],
 ): { status: number | null; stdout: string; stderr: string } {
   const r = spawnSync(
-    "python3",
+    PYTHON,
     [path.join(tmp, ".trellis", "scripts", "get_context.py"), ...args],
     { cwd: tmp, encoding: "utf-8" },
   );
-  return { status: r.status, stdout: r.stdout, stderr: r.stderr };
+  return { status: r.status, stdout: normalizeEol(r.stdout), stderr: r.stderr };
 }
 
 describe.skipIf(!hasPython())("spec injection (path-scoped on-demand)", () => {
@@ -1381,6 +1410,31 @@ print(f"v={rec['v']} version={STATE_VERSION} reset={rec['reset']}")
       expect(r.stdout.trim()).toBe("");
     });
 
+    // One shared hook serves platforms whose tool names differ, and this
+    // integration test drives it with an explicit `toolName`, so the default
+    // trigger set is exactly what decides these cases. A Claude-only default
+    // made spec injection silently inert on DSH: its bridge forwards lowercase
+    // `read`/`write`/`edit`, every event failed the membership test, and
+    // nothing warned. No `spec_injection.tools` is written here on purpose.
+    it("triggers by default for host-specific tool spellings (DSH lowercase)", () => {
+      writeGoverningSpec();
+      // A distinct session per spelling: one shared session would deliver the
+      // spec on the first call and correctly stay silent for the rest, which
+      // would test the refresh state rather than the trigger set.
+      for (const [i, toolName] of ["read", "edit", "write"].entries()) {
+        const r = runHook(
+          tmp,
+          buildPayload(tmp, {
+            filePath: EDITED,
+            toolName,
+            session: `sess-lower-${i}`,
+          }),
+        );
+        expect(r.status).toBe(0);
+        expect(additionalContext(r.stdout)).toContain("<spec-context");
+      }
+    });
+
     it("spec_injection.tools narrows the trigger set: [Edit] silences Read (R6)", () => {
       writeGoverningSpec();
       writeConfig(tmp, ["spec_injection:", "  tools:", "    - Edit"]);
@@ -1896,42 +1950,49 @@ print(f"v={rec['v']} version={STATE_VERSION} reset={rec['reset']}")
         expect(fs.existsSync(agedShard)).toBe(true);
       });
 
-      it("F7: a symlinked project dir cannot walk the GC out of its own base", () => {
-        writeGoverningSpec();
+      // Creating a directory symlink on Windows needs Developer Mode or an
+      // elevated shell; without it fs.symlinkSync throws EPERM before the GC
+      // path under test is ever reached (verified: `fs.symlinkSync(dir, link,
+      // "dir")` → EPERM on a default Windows host).
+      it.skipIf(process.platform === "win32")(
+        "F7: a symlinked project dir cannot walk the GC out of its own base",
+        () => {
+          writeGoverningSpec();
 
-        const base = stateBase(tmp);
-        fs.mkdirSync(base, { recursive: true });
-        // A directory OUTSIDE the state base holding a file whose name and age
-        // both qualify for pruning — reachable only through a planted symlink
-        // that wears a conforming <project16> name.
-        const outside = path.join(tmp, "someone-elses-data");
-        fs.mkdirSync(outside, { recursive: true });
-        const victim = path.join(outside, "session_victim.jsonl");
-        fs.writeFileSync(victim, '{"v":2,"spec":"x"}\n', "utf-8");
-        const aged = new Date(Date.now() - 72 * 3600 * 1000);
-        fs.utimesSync(victim, aged, aged);
-        fs.symlinkSync(outside, path.join(base, "0123456789abcdef"), "dir");
+          const base = stateBase(tmp);
+          fs.mkdirSync(base, { recursive: true });
+          // A directory OUTSIDE the state base holding a file whose name and age
+          // both qualify for pruning — reachable only through a planted symlink
+          // that wears a conforming <project16> name.
+          const outside = path.join(tmp, "someone-elses-data");
+          fs.mkdirSync(outside, { recursive: true });
+          const victim = path.join(outside, "session_victim.jsonl");
+          fs.writeFileSync(victim, '{"v":2,"spec":"x"}\n', "utf-8");
+          const aged = new Date(Date.now() - 72 * 3600 * 1000);
+          fs.utimesSync(victim, aged, aged);
+          fs.symlinkSync(outside, path.join(base, "0123456789abcdef"), "dir");
 
-        // A same-depth directory with a foreign name is skipped by the name
-        // gate even though its shard would otherwise qualify.
-        const foreignDir = path.join(base, "not-a-project-dir");
-        fs.mkdirSync(foreignDir, { recursive: true });
-        const foreignShard = path.join(foreignDir, "session_old.jsonl");
-        fs.writeFileSync(foreignShard, '{"v":2,"spec":"x"}\n', "utf-8");
-        fs.utimesSync(foreignShard, aged, aged);
+          // A same-depth directory with a foreign name is skipped by the name
+          // gate even though its shard would otherwise qualify.
+          const foreignDir = path.join(base, "not-a-project-dir");
+          fs.mkdirSync(foreignDir, { recursive: true });
+          const foreignShard = path.join(foreignDir, "session_old.jsonl");
+          fs.writeFileSync(foreignShard, '{"v":2,"spec":"x"}\n', "utf-8");
+          fs.utimesSync(foreignShard, aged, aged);
 
-        const lastGc = path.join(base, ".last-gc");
-        fs.writeFileSync(lastGc, "", "utf-8");
-        const hoursAgo = new Date(Date.now() - 2 * 3600 * 1000);
-        fs.utimesSync(lastGc, hoursAgo, hoursAgo);
+          const lastGc = path.join(base, ".last-gc");
+          fs.writeFileSync(lastGc, "", "utf-8");
+          const hoursAgo = new Date(Date.now() - 2 * 3600 * 1000);
+          fs.utimesSync(lastGc, hoursAgo, hoursAgo);
 
-        const r = runHook(tmp, buildPayload(tmp, { filePath: EDITED }));
-        expect(r.status).toBe(0);
-        expect(additionalContext(r.stdout)).toContain("<spec-context");
+          const r = runHook(tmp, buildPayload(tmp, { filePath: EDITED }));
+          expect(r.status).toBe(0);
+          expect(additionalContext(r.stdout)).toContain("<spec-context");
 
-        expect(fs.existsSync(victim)).toBe(true);
-        expect(fs.existsSync(foreignShard)).toBe(true);
-      });
+          expect(fs.existsSync(victim)).toBe(true);
+          expect(fs.existsSync(foreignShard)).toBe(true);
+        },
+      );
     });
 
     // -----------------------------------------------------------------------
@@ -2388,7 +2449,7 @@ print(f"v={rec['v']} version={STATE_VERSION} reset={rec['reset']}")
       // pull mode this test drives is the user-visible symptom.
       const repoRoot = path.resolve(__dirname, "../../../..");
       const r = spawnSync(
-        "python3",
+        PYTHON,
         [
           path.join(repoRoot, ".trellis", "scripts", "get_context.py"),
           "--mode",

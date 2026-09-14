@@ -119,10 +119,37 @@ if sys.platform.startswith("win"):
 DIR_WORKFLOW = ".trellis"
 DIR_SPEC = "spec"
 
-# Tools whose events trigger spec matching (Claude Code tool names). Touching a
-# file — even a Read — counts; the miss path stays a fast exit. Overridable via
-# config `spec_injection.tools` (e.g. to drop "Read").
-DEFAULT_EDIT_TOOLS = ("Read", "Edit", "Write", "MultiEdit")
+# Tools whose events trigger spec matching. Touching a file — even a Read —
+# counts; the miss path stays a fast exit. Overridable via config
+# `spec_injection.tools` (e.g. to drop "Read"). An explicit config list
+# REPLACES this set, so narrowing stays a user decision; when the config
+# omits the key, this default must already cover every registered platform.
+#
+# ONE shared hook serves four platforms whose tool names differ, so the
+# default carries both spellings. Claude Code and Codex spell them
+# `Read`/`Edit`/`Write`/`MultiEdit`; DSH's bridge forwards DSH's own lowercase
+# `read`/`write`/`edit` verbatim (`.dsh/DSH.md`, "Paths are the post-tool
+# kind"; `dsh.test.ts` pins the lowercase matcher for exactly this reason).
+# A Claude-only default made spec injection silently inert on DSH: the
+# template shipped a Claude-spelled `tools:` config, every DSH event failed the
+# membership test below, and nothing said so. Keep this list host-complete.
+DEFAULT_EDIT_TOOLS = (
+    "Read",
+    "Edit",
+    "Write",
+    "MultiEdit",
+    "read",
+    "edit",
+    "write",
+)
+
+# Names config `spec_injection.tools` may legitimately list beyond the defaults
+# above: tokens a platform's registration routes to this hook but that should
+# never be enabled by default (Codex/OpenCode patch metadata, and the search
+# tools DSH's matcher also covers). Kept separate from the default set so the
+# "unknown entry" warning below still fires on a typo.
+KNOWN_TOOL_ALIASES = ("apply_patch", "glob", "grep")
+_KNOWN_TOOL_NAMES = frozenset(DEFAULT_EDIT_TOOLS) | frozenset(KNOWN_TOOL_ALIASES)
 
 # Budget defaults sized against Claude Code's documented 10,000-CHARACTER
 # additionalContext ceiling — stay under with margin. The <spec-context>
@@ -315,12 +342,12 @@ def get_spec_injection_settings(
                 )
             else:
                 tools = parsed_tools
-                unknown = [t for t in tools if t not in DEFAULT_EDIT_TOOLS]
+                unknown = [t for t in tools if t not in _KNOWN_TOOL_NAMES]
                 if unknown:
                     _warn(
                         f"unknown spec_injection.tools entries {unknown} — "
                         f"they will never match; known tools: "
-                        f"{list(DEFAULT_EDIT_TOOLS)}"
+                        f"{sorted(_KNOWN_TOOL_NAMES)}"
                     )
 
     return (
