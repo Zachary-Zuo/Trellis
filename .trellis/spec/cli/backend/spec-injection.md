@@ -723,7 +723,37 @@ checklists, no change to sub-agent JSONL curation or its budgets.
 | OpenCode state unavailable                                                 | stateless ticket-only response without `permissionDecision`; tool call proceeds instead of entering a retry loop                                                                                                       |
 | Payload near ceiling                                                      | budget enforced on the assembled payload string — ≤ 9,500 characters with separators, index block, summary and tickets all counted; overflow index lines collapse into a `(+N more …)` summary, itself budget-checked |
 | Invalid config values                                                     | stderr warn, per-key defaults                                                                                                                                                                                         |
+| `tools:` written for another host's spellings                             | **silent** — every event fails the membership test, no warn, no output. Never ship a `tools:` default for this reason; the hook's own default covers both spellings                                                        |
 | Windows PostToolUse quirk                                                 | cosmetic error display only (#45065); worst case: no injection                                                                                                                                                        |
+
+---
+
+## 12. Test harness requirements
+
+The integration suite spawns real Python, which makes the harness itself part of
+the contract — a harness that cannot start reports green while testing nothing:
+
+- **Interpreter resolution**: `TRELLIS_TEST_PYTHON`, falling back to `python3`.
+  A hard-coded `python3` is not portable: Windows usually exposes only
+  `python.exe` (plus a Microsoft Store `python3` stub that exits non-zero), and
+  a conda/venv may expose only `python`. The suite is wrapped in
+  `describe.skipIf(!hasPython())`, so a wrong name turns every test into a
+  **skip** — a passing run that executed nothing.
+- **CRLF**: Windows Python writes CRLF to a pipe, so `stdout.trim().split("\n")`
+  leaves a `\r` on every element and comparisons fail on the line ending rather
+  than on behavior. Probe helpers normalize before returning.
+- **Identity environment**: the hook resolves identity from `*_CONTEXT_ID`
+  overrides too, so `buildPayload` must strip those as well. Running the suite
+  from inside a Trellis session otherwise exports `TRELLIS_CONTEXT_ID` and
+  silently turns the stateless cases stateful.
+- **Symlinks**: creating a directory symlink on Windows needs Developer Mode or
+  an elevated shell; `fs.symlinkSync(..., "dir")` throws EPERM first, so the GC
+  symlink-guard test is platform-gated instead of failing for an unrelated
+  reason.
+
+Invariant to keep: **the shared hook's `DEFAULT_EDIT_TOOLS` must cover every
+registered platform's delivered tool names** (§8), because the default is what
+applies whenever the config omits `tools` — which is the shipped state.
 
 ---
 
