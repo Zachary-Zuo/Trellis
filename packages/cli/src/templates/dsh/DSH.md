@@ -66,15 +66,26 @@ array if it does not exist), then restart `dsh web`:
       config:
         # Absolute: a relative path resolves against the directory that
         # launched the server, not the project.
-        configPath: <absolute path to this project>/.dsh/hooks.json
-        projectDir: <absolute path to this project>
+        configPath: <$DSH_HOME>/trellis-hooks.json
         defaultTimeoutMs: 30000
 ```
 
-The bridge is one config per process, so a second DSH project needs its own
-`configPath` — and replacing this row is a restart, because the config is read
-once at plugin load. An unmounted or unreadable `configPath` is not an error:
-the bridge logs a warning and runs no hooks.
+Copy one project's `.dsh/hooks.json` to that `configPath`. The document is
+identical in every Trellis project on the same version, and **one mount serves
+them all**: every command it holds is project-relative
+(`.dsh/hooks/<script>.py`), and the bridge runs hooks with `cwd` set to the
+session workspace, so each session executes its own project's scripts. Pointing
+`configPath` straight at one project's file behaves the same way; the
+`$DSH_HOME` copy is merely neutral — it does not vanish when that project is
+moved or deleted.
+
+`projectDir` is deliberately omitted. It only sets `CLAUDE_PROJECT_DIR`, and it
+defaults per run to the session workspace, which is the directory each hook
+needs; setting it pins every session's hooks to that one project's directory.
+
+The row is read once at plugin load, so editing it is a restart. An unmounted or
+unreadable `configPath` is not an error: the bridge logs a warning and runs no
+hooks.
 
 ### What is mounted, and what is not
 
@@ -97,18 +108,34 @@ Three limitations are structural, not configuration mistakes:
   matches spec files whose frontmatter declares a non-empty `paths:` list. A
   spec tree without it stays inert no matter how the hooks are mounted.
 
-### Windows: pin the interpreter
+### Windows: the interpreter probe fails under a confined sandbox
 
-`run-python-hook.cjs` probes for a working Python 3 by running each candidate
-with captured output. Where that probe cannot run, every candidate looks
-unusable and the hook exits 127. Set `TRELLIS_PYTHON` to a known interpreter to
-remove the guesswork — on this repository that is the Conda `VR` environment:
+Trellis generates hook commands as
+`node .trellis/scripts/run-python-hook.cjs .dsh/hooks/<script>.py`, and that
+launcher picks an interpreter by running each candidate with **captured (piped)
+output**. DSH executes hook commands through its shell service, which the file
+sandbox confines, so under `workspace-write` (the default) or `read-only` the
+piped spawn is refused, every candidate looks unusable, and the hook exits 127
+before Python ever runs. Pinning `TRELLIS_PYTHON` does not get around this: the
+pinned path is probed exactly the same way. Windows compounds it, because the
+`python` and `python3` that PATH commonly resolves to there are Microsoft Store
+stubs that exit non-zero.
 
-```powershell
-$env:TRELLIS_PYTHON = (conda env list --json | ConvertFrom-Json).envs |
-  Where-Object { (Split-Path -Leaf $_) -eq 'VR' } |
-  ForEach-Object { Join-Path $_ 'python.exe' }
-```
+Two ways out:
+
+1. **Call the interpreter directly**, in the config the row mounts. Replace each
+   command's `node .trellis/scripts/run-python-hook.cjs` prefix with an absolute
+   interpreter path, keeping the script and its `-X utf8`:
+
+   ```
+   <absolute python.exe> -X utf8 .dsh/hooks/session-start.py
+   ```
+
+   No probe runs, and the mounted config is machine-local by construction, so
+   naming an absolute interpreter there costs nothing. Keep `-X utf8`: hook
+   input and output are UTF-8 regardless of the host console codepage.
+2. **Run DSH without the confinement** (`DSH_PERMISSION_MODE=danger-full-access`),
+   which restores piped stdio and lets the shipped launcher work as designed.
 
 ## Nested host sessions
 
