@@ -44,6 +44,66 @@ role, check whether the `trellis_wait` tool is available:
 Never replace either path with shell sleep, polling loops, `job_output`, or
 repeated agent-list polling.
 
+## Hooks: mount the bridge once
+
+DSH has no hook system of its own, so Trellis cannot make these hooks fire by
+writing files into the project. It writes `.dsh/hooks.json` and the scripts
+under `.dsh/hooks/`; you mount the bridge that reads them.
+
+Add this to `$DSH_HOME/cordis.patch.yml` (create the file as a top-level YAML
+array if it does not exist), then restart `dsh web`:
+
+```yaml
+- insert:
+    - id: hooks-claude-code
+      name: '@deepseek-ai/dsh-hooks-claude-code'
+      config:
+        # Absolute: a relative path resolves against the directory that
+        # launched the server, not the project.
+        configPath: <absolute path to this project>/.dsh/hooks.json
+        projectDir: <absolute path to this project>
+        defaultTimeoutMs: 30000
+```
+
+The bridge is one config per process, so a second DSH project needs its own
+`configPath` — and replacing this row is a restart, because the config is read
+once at plugin load. An unmounted or unreadable `configPath` is not an error:
+the bridge logs a warning and runs no hooks.
+
+### What is mounted, and what is not
+
+| Event | Script | Delivers |
+|---|---|---|
+| `SessionStart` | `session-start.py` | workflow overview in the session |
+| `UserPromptSubmit` | `inject-workflow-state.py` | per-turn workflow-state breadcrumb |
+| `PostToolUse` | `inject-spec-context.py` | path-scoped spec injection |
+| `SubagentStart` | `inject-subagent-context.py` | child task context |
+
+Three limitations are structural, not configuration mistakes:
+
+- **`PreToolUse` cannot rewrite tool input.** The bridge logs and ignores
+  `updatedInput`, so `inject-subagent-context.py` contributes only through
+  `SubagentStart`.
+- **Paths are the post-tool kind.** The `PostToolUse` matcher lists DSH's
+  lowercase tool names (`read`, `write`, `edit`, `glob`, `grep`). Claude-spelled
+  names would never match.
+- **Spec injection needs `paths:` frontmatter.** `inject-spec-context.py` only
+  matches spec files whose frontmatter declares a non-empty `paths:` list. A
+  spec tree without it stays inert no matter how the hooks are mounted.
+
+### Windows: pin the interpreter
+
+`run-python-hook.cjs` probes for a working Python 3 by running each candidate
+with captured output. Where that probe cannot run, every candidate looks
+unusable and the hook exits 127. Set `TRELLIS_PYTHON` to a known interpreter to
+remove the guesswork — on this repository that is the Conda `VR` environment:
+
+```powershell
+$env:TRELLIS_PYTHON = (conda env list --json | ConvertFrom-Json).envs |
+  Where-Object { (Split-Path -Leaf $_) -eq 'VR' } |
+  ForEach-Object { Join-Path $_ 'python.exe' }
+```
+
 ## Nested host sessions
 
 DSH inherits ordinary environment variables from the process that launches it.
@@ -64,6 +124,8 @@ from the shell's own session id.
   skills.
 - `.dsh/skills/trellis-agent-{research,implement,check}/` — child-only role
   skills; implement/check include the pull-based task context prelude.
+- `.dsh/hooks/` + `.dsh/hooks.json` — shared hook scripts and the bridge config
+  the operator mounts (see above).
 - `.dsh/DSH.md` — this operator guide.
 - `.trellis/` — workflow, specs, tasks, workspace journal, and shared scripts.
 

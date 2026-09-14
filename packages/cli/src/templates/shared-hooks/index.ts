@@ -43,7 +43,8 @@ export type SharedHookPlatform =
   | "droid"
   | "kiro"
   | "trae"
-  | "zcode";
+  | "zcode"
+  | "dsh";
 
 /**
  * Which shared hooks each platform actually invokes. Single source of truth
@@ -99,6 +100,15 @@ export type SharedHookPlatform =
  *   `Agent|Task`. Live probing confirmed `hookSpecificOutput.updatedInput`
  *   reaches the sub-agent prompt, so ZCode is class-1 and ships
  *   `inject-subagent-context.py`.
+ * - DSH (0.1.5+) has no hook system of its own; it reaches these scripts through
+ *   the `@deepseek-ai/dsh-hooks-claude-code` bridge, mounted by the operator in
+ *   their DSH profile. Trellis writes `.dsh/hooks.json` for that bridge and the
+ *   scripts under `.dsh/hooks/`. Two probe-verified constraints shape the set:
+ *   the bridge's `SubagentStart` seam injects context but its `PreToolUse` seam
+ *   ignores `updatedInput`, and the bridge spawns hooks with no `DSH_*`
+ *   namespace (it does set `CLAUDE_PROJECT_DIR`), which is why both
+ *   `session-start.py` and `inject-workflow-state.py` detect DSH from the
+ *   `.dsh` script path before trusting any environment alias.
  */
 export const SHARED_HOOKS_BY_PLATFORM: Record<
   SharedHookPlatform,
@@ -159,6 +169,22 @@ export const SHARED_HOOKS_BY_PLATFORM: Record<
     "inject-shell-session-context.py",
     "inject-workflow-state.py",
     "inject-subagent-context.py",
+  ],
+  // DSH reaches hooks only through the `dsh-hooks-claude-code` bridge, so this
+  // set is exactly what that bridge's interception seams can carry.
+  // `session-start.py` (SessionStart), `inject-workflow-state.py`
+  // (UserPromptSubmit) and `inject-spec-context.py` (PostToolUse) all deliver
+  // through `hookSpecificOutput.additionalContext`, which the bridge honors.
+  // `inject-subagent-context.py` ships for its `SubagentStart` branch only: the
+  // bridge logs and ignores `updatedInput`, so that script's PreToolUse delivery
+  // path is inert here. `inject-shell-session-context.py` is absent because the
+  // bridge registers no pre-shell event, and DSH publishes session identity into
+  // model shells through its own layering instead.
+  dsh: [
+    "session-start.py",
+    "inject-workflow-state.py",
+    "inject-subagent-context.py",
+    "inject-spec-context.py",
   ],
 };
 

@@ -17,7 +17,9 @@ You are already the `trellis-check` sub-agent that the main session dispatched. 
 - If workflow.md, workflow-state breadcrumbs, or the parent prompt say to dispatch `trellis-implement` / `trellis-check`, treat that as a main-session instruction that is already satisfied by your current role.
 - Only the main session may dispatch Trellis implement/check agents. If more implementation work is needed, report that recommendation instead of spawning.
 
-dsh does not auto-inject SessionStart task context. Always pull context as required below.
+dsh injects SessionStart task context only when the project mounts the
+`dsh-hooks-claude-code` bridge (see `.dsh/DSH.md`). Never depend on it — always
+pull context as required below.
 
 ## Context
 

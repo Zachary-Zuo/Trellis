@@ -76,13 +76,13 @@ describe("shared-hooks capability table", () => {
     );
   });
 
-  it("inject-spec-context.py is distributed to Claude Code, Codex, and OpenCode", () => {
+  it("inject-spec-context.py is distributed to Claude Code, Codex, OpenCode, and DSH", () => {
     const providers = Object.entries(SHARED_HOOKS_BY_PLATFORM)
       .filter(([, hooks]) => hooks.includes("inject-spec-context.py"))
       .map(([platform]) => platform)
       .sort();
 
-    expect(providers).toEqual(["claude", "codex", "opencode"]);
+    expect(providers).toEqual(["claude", "codex", "dsh", "opencode"]);
   });
 
   it("codex + copilot do not take the shared session-start.py (they bundle their own)", () => {
@@ -99,10 +99,7 @@ describe("shared-hooks capability table", () => {
   // instead of silently shipping a script nothing calls. Never hard-code the
   // platform list here; that is the failure mode this test exists to prevent.
   describe("shared hooks are registered in each platform's own hook config", () => {
-    function registrationsOf(
-      platform: string,
-      hook: SharedHookName,
-    ): string[] {
+    function registrationsOf(platform: string, hook: SharedHookName): string[] {
       const tool = resolveCliFlag(platform);
       if (!tool) {
         throw new Error(
@@ -186,6 +183,55 @@ describe("shared-hooks capability table", () => {
         "session-start.py",
       ].sort(),
     );
+  });
+
+  it("dsh registers session-start, workflow-state, subagent-context, and spec-context hooks", () => {
+    // DSH reaches hooks only through the `dsh-hooks-claude-code` bridge. Its
+    // SubagentStart seam injects context, so inject-subagent-context.py ships;
+    // its PreToolUse seam ignores `updatedInput`, so that script contributes only
+    // through SubagentStart. No pre-shell seam exists, hence no
+    // inject-shell-session-context.py.
+    expect([...SHARED_HOOKS_BY_PLATFORM.dsh].sort()).toEqual(
+      [
+        "inject-spec-context.py",
+        "inject-subagent-context.py",
+        "inject-workflow-state.py",
+        "session-start.py",
+      ].sort(),
+    );
+  });
+
+  it("every hook that detects a platform detects DSH before any env alias", () => {
+    // DSH's bridge spawns hooks with no DSH_* namespace but DOES set
+    // CLAUDE_PROJECT_DIR, so the shared `env_map` would otherwise claim the
+    // event as claude and resolve `claude_<id>` — a key `task.py start`, which
+    // runs in a DSH shell that exports DSH_SESSION_ID, never writes. The script
+    // path is the only reliable marker. This is checked per script because the
+    // detection block is duplicated across hook files, and every previous
+    // correction missed at least one copy.
+    const detectors = getSharedHookScripts().filter((hook) =>
+      hook.content.includes("def _detect_platform"),
+    );
+    expect(
+      detectors.length,
+      "no hook defines _detect_platform — this guard would be vacuous",
+    ).toBeGreaterThan(0);
+
+    for (const hook of detectors) {
+      const detect = hook.content.indexOf("def _detect_platform");
+      const dshCheck = hook.content.indexOf('".dsh" in ', detect);
+      const envMap = hook.content.indexOf("env_map = {", detect);
+      expect(
+        dshCheck,
+        `${hook.name} detects platforms but never checks for ".dsh"`,
+      ).toBeGreaterThan(-1);
+      if (envMap > -1) {
+        expect(
+          dshCheck,
+          `${hook.name} checks ".dsh" after its env_map, so CLAUDE_PROJECT_DIR wins and DSH resolves as claude`,
+        ).toBeLessThan(envMap);
+      }
+    }
   });
 
   it("getSharedHookScriptsForPlatform returns exactly the declared set per platform", () => {

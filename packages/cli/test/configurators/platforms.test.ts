@@ -107,13 +107,14 @@ const CONFIGURE_ONLY_PATHS = new Set([".claude/hooks/statusline.py"]);
  * `Map<path, content>` cannot express an empty directory, so each one is
  * named here against the platform that needs it.
  */
-const CONFIGURE_ONLY_EMPTY_DIRS: Partial<Record<(typeof PLATFORM_IDS)[number], string[]>> =
-  {
-    // Trellis ships no Codex-specific skills (they all land in
-    // `.agents/skills/`, which Codex reads too). The directory is still
-    // created so users have the conventional place for their own.
-    codex: [".codex/skills"],
-  };
+const CONFIGURE_ONLY_EMPTY_DIRS: Partial<
+  Record<(typeof PLATFORM_IDS)[number], string[]>
+> = {
+  // Trellis ships no Codex-specific skills (they all land in
+  // `.agents/skills/`, which Codex reads too). The directory is still
+  // created so users have the conventional place for their own.
+  codex: [".codex/skills"],
+};
 
 /** Every file under `root`, as POSIX paths relative to `root`. */
 function walkFiles(root: string, rel = ""): string[] {
@@ -195,7 +196,10 @@ describe("getConfiguredPlatforms", () => {
     });
     expect(getConfiguredPlatforms(tmpDir).has("devin")).toBe(false);
 
-    fs.writeFileSync(path.join(workflowsDir, "trellis-continue.md"), "# Trellis");
+    fs.writeFileSync(
+      path.join(workflowsDir, "trellis-continue.md"),
+      "# Trellis",
+    );
     const result = getConfiguredPlatforms(tmpDir);
     expect(result.has("devin")).toBe(true);
   });
@@ -916,7 +920,9 @@ describe("configurePlatform", () => {
       fs.mkdirSync(path.join(emptyDir, ".snow"), { recursive: true });
       fs.writeFileSync(path.join(emptyDir, ".snow", "settings.json"), "{}");
       expect(getConfiguredPlatforms(emptyDir).has("snow")).toBe(false);
-      fs.mkdirSync(path.join(emptyDir, ".snow", "commands"), { recursive: true });
+      fs.mkdirSync(path.join(emptyDir, ".snow", "commands"), {
+        recursive: true,
+      });
       expect(getConfiguredPlatforms(emptyDir).has("snow")).toBe(false);
       fs.mkdirSync(path.join(emptyDir, ".snow", "agents"), { recursive: true });
       expect(getConfiguredPlatforms(emptyDir).has("snow")).toBe(false);
@@ -1039,9 +1045,7 @@ describe("configurePlatform", () => {
       "trellis-finish-work",
     ]) {
       expect(
-        fs.existsSync(
-          path.join(tmpDir, ".dsh", "skills", name, "SKILL.md"),
-        ),
+        fs.existsSync(path.join(tmpDir, ".dsh", "skills", name, "SKILL.md")),
       ).toBe(true);
     }
     expect(
@@ -1063,13 +1067,7 @@ describe("configurePlatform", () => {
     ).toBe(false);
     expect(
       fs.existsSync(
-        path.join(
-          tmpDir,
-          ".dsh",
-          "skills",
-          "trellis-agent-check",
-          "SKILL.md",
-        ),
+        path.join(tmpDir, ".dsh", "skills", "trellis-agent-check", "SKILL.md"),
       ),
     ).toBe(true);
     expect(
@@ -1078,10 +1076,7 @@ describe("configurePlatform", () => {
       ),
     ).toBe(false);
 
-    const guide = fs.readFileSync(
-      path.join(tmpDir, ".dsh", "DSH.md"),
-      "utf-8",
-    );
+    const guide = fs.readFileSync(path.join(tmpDir, ".dsh", "DSH.md"), "utf-8");
     expect(guide).toContain("class-2");
     expect(guide).toContain("Without companion plugin");
     expect(guide).toContain("run_in_background: false");
@@ -1089,10 +1084,14 @@ describe("configurePlatform", () => {
     expect(fs.existsSync(path.join(tmpDir, ".dsh", "settings.json"))).toBe(
       false,
     );
-    expect(fs.existsSync(path.join(tmpDir, ".dsh", "hooks"))).toBe(false);
+    // dsh gets hooks through the bridge, not a native hook surface: the config
+    // and its scripts are written, while the native settings/config files stay
+    // absent.
+    expect(fs.existsSync(path.join(tmpDir, ".dsh", "hooks.json"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, ".dsh", "hooks"))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, ".dsh", "agents"))).toBe(false);
-    expect(AI_TOOLS.dsh.templateContext.hasHooks).toBe(false);
-    expect(AI_TOOLS.dsh.hasPythonHooks).toBe(false);
+    expect(AI_TOOLS.dsh.templateContext.hasHooks).toBe(true);
+    expect(AI_TOOLS.dsh.hasPythonHooks).toBe(true);
     expect(AI_TOOLS.dsh.supportsAgentSkills).toBe(true);
   });
 

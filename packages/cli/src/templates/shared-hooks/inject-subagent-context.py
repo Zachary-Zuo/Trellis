@@ -88,6 +88,14 @@ def find_repo_root(start_path: str) -> str | None:
 
 
 def _detect_platform(input_data: dict) -> str | None:
+    # DSH's Claude Code hook bridge also emits `SubagentStart`, so the
+    # event-name shortcut below would claim a DSH child as codex and resolve
+    # `codex_<id>` — a key `task.py start` never wrote. The `.dsh` script path is
+    # the reliable marker (the bridge runs this file from `.dsh/hooks/`), so it
+    # has to come first. Codex paths carry `.codex`, never `.dsh`, so its branch
+    # is unaffected.
+    if ".dsh" in set(Path(sys.argv[0]).parts):
+        return "dsh"
     if _hook_event_name(input_data) == "SubagentStart":
         return "codex"
     if isinstance(input_data.get("cursor_version"), str):

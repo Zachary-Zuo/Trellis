@@ -206,6 +206,17 @@ def _format_git_state(repo_root: Path) -> str:
 def _detect_platform(input_data: dict) -> str | None:
     if isinstance(input_data.get("cursor_version"), str):
         return "cursor"
+    # DSH's Claude Code hook bridge sets CLAUDE_PROJECT_DIR, but the hook
+    # process it spawns carries no DSH_* namespace (that is contributed per
+    # model shell execution, not to bridge-spawned children). Without this
+    # check the alias below claims the event and the context key becomes
+    # `claude_<id>`, while `task.py start` — run in a DSH shell that DOES
+    # export DSH_SESSION_ID — writes `dsh_<id>`. The two never match, so every
+    # turn reports no_task while the pointer exists on disk. The script path is
+    # the one reliable DSH marker because the bridge runs this file from
+    # `.dsh/hooks/`, so it must be checked before any environment alias.
+    if ".dsh" in set(Path(sys.argv[0]).parts):
+        return "dsh"
     # CLAUDE_PROJECT_DIR is a compatibility alias that several hosts set
     # alongside their own variable — CodeBuddy, ZCode and Trae all do. It must
     # therefore be checked LAST, or every one of them is detected as claude and

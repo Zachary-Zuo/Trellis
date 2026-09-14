@@ -158,15 +158,50 @@ describe("dsh collectDshTemplates", () => {
     expect(metaAgents).not.toContain("otherwise initial foreground dispatch");
   });
 
-  it("ships the operator guide and no hooks/settings files", () => {
+  it("ships the operator guide, the hook bridge config, and the shared hook scripts", () => {
     const files = collectDshTemplates();
     expect(files.get(".dsh/DSH.md")).toContain(
       "Companion plugin fallback contract",
     );
-    for (const key of files.keys()) {
-      expect(key.startsWith(".dsh/hooks")).toBe(false);
-      expect(key).not.toBe(".dsh/settings.json");
-      expect(key).not.toBe(".dsh/config.toml");
+
+    // DSH has no hook system; `.dsh/hooks.json` is the config the operator
+    // mounts through `@deepseek-ai/dsh-hooks-claude-code`, and the scripts it
+    // names are the same shared scripts every other platform ships.
+    const hooksConfig = files.get(".dsh/hooks.json");
+    expect(hooksConfig).toBeDefined();
+    const parsed = JSON.parse(hooksConfig ?? "{}") as {
+      hooks: Record<
+        string,
+        { matcher?: string; hooks: { command: string }[] }[]
+      >;
+    };
+    expect(Object.keys(parsed.hooks).sort()).toEqual([
+      "PostToolUse",
+      "SessionStart",
+      "SubagentStart",
+      "UserPromptSubmit",
+    ]);
+
+    for (const script of [
+      "session-start.py",
+      "inject-workflow-state.py",
+      "inject-spec-context.py",
+      "inject-subagent-context.py",
+    ]) {
+      expect(
+        files.has(`.dsh/hooks/${script}`),
+        `${script} must be written under .dsh/hooks/`,
+      ).toBe(true);
     }
+
+    // DSH's filesystem tools are lowercase; a Claude-spelled matcher (or a
+    // missing one) would leave spec injection silently inert.
+    const postTool = parsed.hooks.PostToolUse?.[0]?.matcher ?? "";
+    expect(postTool).toContain("read");
+    expect(postTool).toContain("edit");
+    expect(postTool).not.toMatch(/Read|Edit|Write|MultiEdit/);
+
+    expect(files.has(".dsh/settings.json")).toBe(false);
+    expect(files.has(".dsh/config.toml")).toBe(false);
   });
 });

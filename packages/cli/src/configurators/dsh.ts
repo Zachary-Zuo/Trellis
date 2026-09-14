@@ -1,29 +1,33 @@
 /**
  * DeepSeek Harness (dsh) configurator.
  *
- * dsh is a class-2 pull-based platform (agentCapable via the `subagent` tool,
- * no shipped session-start hook, no project-level hooks/settings Trellis may
- * write). Three output paths:
+ * dsh reaches hooks only through the `@deepseek-ai/dsh-hooks-claude-code`
+ * bridge, which the operator mounts once in their DSH profile; Trellis writes
+ * the bridge config and the scripts it names. Four output paths:
  * - `.agents/skills/` — workflow + bundled skills, written via the NEUTRAL
  *   resolver so the files stay byte-identical to Codex/Gemini/Pi/Kimi writes
  *   into the same shared root (dsh discovers `.agents/skills/` natively).
- * - `.dsh/skills/` — dsh-private entry skills (trellis-start /
- *   trellis-continue / trellis-finish-work) plus collision-free Trellis role
+ * - `.dsh/skills/` — dsh-private entry skills plus collision-free Trellis role
  *   skills (trellis-agent-implement / trellis-agent-check /
  *   trellis-agent-research) with the pull-based prelude on implement/check.
+ * - `.dsh/hooks/` + `.dsh/hooks.json` — the shared hook scripts and the Claude
+ *   Code dialect config the bridge reads.
  * - `.dsh/DSH.md` — operator guide and a configDir-owned tracked file for
  *   platform detection and uninstall scoping.
  *
- * dsh has no project-level hooks/settings file Trellis may write and no
- * declarative custom sub-agent definitions (dispatch goes through the
- * `subagent` tool), so no hooks, settings, or extension files are written and
- * the agent prompts ship as skills.
+ * dsh has no declarative custom sub-agent definitions (dispatch goes through
+ * the `subagent` tool), so the agent prompts ship as skills.
  */
 
 import { AI_TOOLS } from "../types/ai-tools.js";
-import { getAllAgents, getDshGuide } from "../templates/dsh/index.js";
+import {
+  getAllAgents,
+  getDshGuide,
+  getDshHooksConfig,
+} from "../templates/dsh/index.js";
 import {
   applyPullBasedPreludeMarkdown,
+  collectSharedHooks,
   collectSkillTemplates,
   replacePythonCommandLiterals,
   resolveAllAsSkills,
@@ -51,6 +55,22 @@ function resolveDshCommandSkills(): ReturnType<typeof resolveAllAsSkills> {
   const ctx = AI_TOOLS.dsh.templateContext;
   return resolveAllAsSkills(ctx).filter((skill) =>
     DSH_COMMAND_SKILL_NAMES.has(skill.name),
+  );
+}
+
+/**
+ * `trellis-start` as an explicit escape hatch.
+ *
+ * `resolveAllAsSkills` drops `start` once `hasHooks` is true (the SessionStart
+ * hook injects the workflow overview instead), which is right for the automatic
+ * path but would leave a dsh user with no way to bootstrap Trellis on demand.
+ * Claude Code keeps `/trellis:start` as a command for exactly this; dsh has no
+ * slash-command mechanism, so it stays a skill.
+ */
+function resolveDshStartSkill(): ReturnType<typeof resolveAllAsSkills> {
+  const ctx = { ...AI_TOOLS.dsh.templateContext, hasHooks: false };
+  return resolveAllAsSkills(ctx).filter(
+    (skill) => skill.name === "trellis-start",
   );
 }
 
@@ -91,12 +111,23 @@ export function collectDshTemplates(): Map<string, string> {
   // 2. Commands-as-skills + Trellis agent prompts → `.dsh/skills/`.
   for (const [filePath, content] of collectSkillTemplates(".dsh/skills", [
     ...resolveDshCommandSkills(),
+    ...resolveDshStartSkill(),
     ...resolveDshAgentSkills(),
   ])) {
     files.set(filePath, content);
   }
 
-  // 3. Operator guide → `.dsh/DSH.md`.
+  // 3. Hook scripts + bridge config → `.dsh/hooks/` and `.dsh/hooks.json`.
+  //    `.dsh/hooks.json` is what the operator mounts through
+  //    `@deepseek-ai/dsh-hooks-claude-code`; it is written unconditionally, so
+  //    `trellis update` re-materializes it in projects initialized before dsh
+  //    had any hook support.
+  for (const [k, v] of collectSharedHooks(".dsh/hooks", "dsh")) {
+    files.set(k, v);
+  }
+  files.set(".dsh/hooks.json", getDshHooksConfig());
+
+  // 4. Operator guide → `.dsh/DSH.md`.
   files.set(".dsh/DSH.md", getDshGuide());
 
   return files;

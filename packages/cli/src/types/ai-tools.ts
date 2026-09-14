@@ -406,7 +406,7 @@ export const AI_TOOLS: Record<AITool, AIToolConfig> = {
     },
   },
   /**
-   * DeepSeek Harness (dsh) — class-2 pull-based platform.
+   * DeepSeek Harness (dsh) — agent-capable; hooks arrive through a bridge.
    *
    * DSH discovers skills from `<projectRoot>/.agents/skills/` (shared root,
    * rank 200) and `<projectRoot>/.dsh/skills/` (DSH-private root, rank 100),
@@ -425,8 +425,13 @@ export const AI_TOOLS: Record<AITool, AIToolConfig> = {
    * (trellis-agent-implement / trellis-agent-check / trellis-agent-research)
    * live under `.dsh/skills/` with the pull-based prelude on implement/check.
    *
-   * DSH has no project-level hooks/settings file Trellis may write, so
-   * hasHooks/hasPythonHooks stay false and no hook assets are emitted.
+   * DSH itself has no hook system, but `@deepseek-ai/dsh-hooks-claude-code`
+   * runs a Claude Code dialect hook config on the harness interception seams.
+   * Trellis therefore writes `.dsh/hooks.json` plus the shared hook scripts
+   * under `.dsh/hooks/`, for the operator to mount once in their DSH profile.
+   * Because that bridge delivers SessionStart context, `hasHooks` is true and
+   * `trellis-start` is filtered out of the skill set — the hook supplies the
+   * workflow overview instead. See `.dsh/DSH.md` for the mount snippet.
    */
   dsh: {
     name: "DeepSeek Harness (dsh)",
@@ -435,13 +440,13 @@ export const AI_TOOLS: Record<AITool, AIToolConfig> = {
     supportsAgentSkills: true,
     cliFlag: "dsh",
     defaultChecked: false,
-    hasPythonHooks: false,
+    hasPythonHooks: true,
     templateContext: {
       cmdRefPrefix: "trellis-",
       executorAI: "Bash scripts or tool calls",
       userActionLabel: "Skills",
       agentCapable: true,
-      hasHooks: false,
+      hasHooks: true,
       cliFlag: "dsh",
     },
   },

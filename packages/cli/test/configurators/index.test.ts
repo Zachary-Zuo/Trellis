@@ -485,16 +485,16 @@ describe("collectPlatformTemplates", () => {
     expect(result?.has(".kimi-code/skills/trellis-continue/SKILL.md")).toBe(
       true,
     );
-    expect(
-      result?.has(".kimi-code/skills/trellis-finish-work/SKILL.md"),
-    ).toBe(true);
-    expect(
-      result?.has(".kimi-code/skills/trellis-implement/SKILL.md"),
-    ).toBe(true);
+    expect(result?.has(".kimi-code/skills/trellis-finish-work/SKILL.md")).toBe(
+      true,
+    );
+    expect(result?.has(".kimi-code/skills/trellis-implement/SKILL.md")).toBe(
+      true,
+    );
     expect(result?.has(".kimi-code/skills/trellis-check/SKILL.md")).toBe(true);
-    expect(
-      result?.has(".kimi-code/skills/trellis-research/SKILL.md"),
-    ).toBe(true);
+    expect(result?.has(".kimi-code/skills/trellis-research/SKILL.md")).toBe(
+      true,
+    );
     // Custom sub-agent definitions
     expect(result?.has(".kimi-code/agents/trellis-implement.md")).toBe(true);
     expect(result?.has(".kimi-code/agents/trellis-check.md")).toBe(true);
@@ -529,10 +529,12 @@ describe("collectPlatformTemplates", () => {
       true,
     );
     expect(result?.has(".dsh/DSH.md")).toBe(true);
-    // No project-level hooks/settings for dsh
-    expect(
-      [...(result?.keys() ?? [])].some((key) => key.startsWith(".dsh/hooks")),
-    ).toBe(false);
+    // dsh reaches hooks through the `dsh-hooks-claude-code` bridge: Trellis
+    // writes the bridge config plus the scripts it names, and the operator
+    // mounts it once in their DSH profile.
+    expect(result?.has(".dsh/hooks.json")).toBe(true);
+    expect(result?.has(".dsh/hooks/session-start.py")).toBe(true);
+    expect(result?.has(".dsh/hooks/inject-spec-context.py")).toBe(true);
     expect(result?.has(".dsh/settings.json")).toBe(false);
     expect(result?.has(".dsh/config.toml")).toBe(false);
   });
