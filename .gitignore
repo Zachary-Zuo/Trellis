@@ -141,26 +141,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Ralph Loop state file
-.trellis/.ralph-state.json
-
-# Trellis local state (should not be committed)
-.trellis/.current-task
-.trellis/.runtime/
-.trellis/.developer
-.trellis/hooks.local.json
 .gitnexus/
-
-# Multi-agent temp files
-.session-id
-.agent-log
-.agent-runner.sh
-
-# OpenCode local config (contains local proxy settings)
-opencode.json
-
-# iFlow local config (if it has local state files)
-.iflow/settings.local.json
 
 # Python cache
 __pycache__/
@@ -169,13 +150,8 @@ __pycache__/
 
 .reference
 
-.trellis/tasks/01-23-eng-blog-research
-
 # External reference code
 third/
-
-# Test scripts (development only)
-.trellis/scripts/test/
 
 doc/
 smoke_test/

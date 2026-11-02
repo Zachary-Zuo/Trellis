@@ -1,7 +1,7 @@
 {
   "name": "@zachary/trellis-core",
   "version": "0.7.0-beta.4-zachary.1",
-  "description": "Trellis core SDK — channel and task domain primitives consumed by the Trellis CLI and downstream Node services",
+  "description": "Trellis core SDK — read-only recall of local AI agent session history, consumed by the Trellis CLI",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,25 +12,10 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./channel": {
-      "types": "./dist/channel/index.d.ts",
-      "import": "./dist/channel/index.js",
-      "default": "./dist/channel/index.js"
-    },
     "./mem": {
       "types": "./dist/mem/index.d.ts",
       "import": "./dist/mem/index.js",
       "default": "./dist/mem/index.js"
-    },
-    "./task": {
-      "types": "./dist/task/index.d.ts",
-      "import": "./dist/task/index.js",
-      "default": "./dist/task/index.js"
-    },
-    "./testing": {
-      "types": "./dist/testing/index.d.ts",
-      "import": "./dist/testing/index.js",
-      "default": "./dist/testing/index.js"
     }
   },
   "files": [
@@ -53,10 +38,10 @@
   },
   "keywords": [
     "trellis",
-    "channel",
     "sdk",
     "agent",
-    "events"
+    "session",
+    "memory"
   ],
   "author": "Mindfold LLC",
   "license": "AGPL-3.0-only",
