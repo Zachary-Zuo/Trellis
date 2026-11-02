@@ -1,9 +1,7 @@
 /**
- * Trellis - AI-assisted development workflow framework
- *
- * Based on Anthropic's "Effective Harnesses for Long-Running Agents"
- * https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents
+ * Trellis — local AI session recall (`trellis mem`) plus a small set of
+ * manual-only collaboration skills installed into projects.
  */
 
 export { VERSION } from "./constants/version.js";
-export { init } from "./commands/init.js";
+export { init, update } from "./commands/skills.js";

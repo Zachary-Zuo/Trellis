@@ -80,14 +80,20 @@ describe("upgrade command", () => {
     await upgrade({ tag: "latest" }, runner);
 
     expect(runner).toHaveBeenCalledWith(
-      "npm",
-      ["install", "-g", "@zachary/trellis@latest"],
+      process.platform === "win32" ? "cmd.exe" : "npm",
+      process.platform === "win32"
+        ? ["/d", "/s", "/c", "npm install -g @zachary/trellis@latest"]
+        : ["install", "-g", "@zachary/trellis@latest"],
       { stdio: "inherit", shell: false },
     );
     expect(log).toHaveBeenCalledWith(
       expect.stringContaining("trellis --version"),
     );
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("which trellis"));
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        process.platform === "win32" ? "where trellis" : "which trellis",
+      ),
+    );
 
     log.mockRestore();
   });
@@ -95,9 +101,12 @@ describe("upgrade command", () => {
   it("fails when npm exits non-zero", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const runner = vi.fn(() => ({ status: 1, signal: null }));
+    const binaryCheck = process.platform === "win32" ? "where" : "which";
 
     await expect(upgrade({ tag: "latest" }, runner)).rejects.toThrow(
-      /npm install failed with exit code 1\.[\s\S]*Troubleshooting:[\s\S]*Manual command: npm install -g @zachary\/trellis@latest[\s\S]*npm config get prefix[\s\S]*which trellis/,
+      new RegExp(
+        String.raw`npm install failed with exit code 1\.[\s\S]*Troubleshooting:[\s\S]*Manual command: npm install -g @zachary/trellis@latest[\s\S]*npm config get prefix[\s\S]*${binaryCheck} trellis`,
+      ),
     );
 
     log.mockRestore();
